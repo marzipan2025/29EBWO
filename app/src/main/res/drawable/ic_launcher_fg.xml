@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 글줄 세 개. 흑백뿐이라 e-ink 아이콘으로도 그대로 읽힌다. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#000000" android:pathData="M30,42 h48 v5 h-48 z" />
+    <path android:fillColor="#000000" android:pathData="M30,53 h48 v5 h-48 z" />
+    <path android:fillColor="#000000" android:pathData="M30,64 h26 v5 h-26 z" />
+</vector>

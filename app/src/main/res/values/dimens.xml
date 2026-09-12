@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="touch">56dp</dimen>
+    <dimen name="gap">12dp</dimen>
+    <dimen name="hairline">1.5dp</dimen>
+    <dimen name="ui_text">13sp</dimen>
+</resources>
