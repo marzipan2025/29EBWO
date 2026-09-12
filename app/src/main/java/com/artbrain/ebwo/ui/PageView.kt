@@ -81,8 +81,10 @@ class PageView @JvmOverloads constructor(
 
     private fun lineHeight(): Float {
         val fm = paint.fontMetrics
-        return (fm.descent - fm.ascent) * Ink.LINE_SPACING
+        return (fm.descent - fm.ascent) * Ink.LINE_SPACING + spacingAdd
     }
+
+    private val spacingAdd = Ink.dp(context, Ink.LINE_SPACING_ADD_DP)
 
     /** 띄어쓰기에서만 끊어 나눈 줄들 */
     private fun wrapLines(s: String): List<String> =
@@ -93,7 +95,9 @@ class PageView @JvmOverloads constructor(
 
         boxW = (width * Ink.BOX_FRACTION).toInt().coerceAtLeast(1)
         boxH = (height * Ink.BOX_FRACTION).toInt().coerceAtLeast(1)
-        maxLines = floor(boxH / lineHeight()).toInt().coerceAtLeast(1)
+        // 상자 높이가 허락하는 줄 수와 [Ink.MAX_LINES] 가운데 작은 쪽.
+        val roomy = floor(boxH / lineHeight()).toInt()
+        maxLines = minOf(Ink.MAX_LINES, roomy).coerceAtLeast(1)
 
         val fits: (String) -> Boolean = { s ->
             s.isEmpty() || wrapLines(s).size <= maxLines
@@ -122,7 +126,7 @@ class PageView @JvmOverloads constructor(
         layout = StaticLayout.Builder
             .obtain(wrapped, 0, wrapped.length, paint, boxW)
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
-            .setLineSpacing(0f, Ink.LINE_SPACING)
+            .setLineSpacing(spacingAdd, Ink.LINE_SPACING)
             .setIncludePad(false)
             .build()
     }
