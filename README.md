@@ -91,12 +91,14 @@ kotlinc -include-runtime -d t.jar app/src/main/java/com/artbrain/ebwo/text/*.kt 
 
 ## 글꼴
 
-본문은 **JTBC 명조(`JTBC-Regular.ttf`)** 로 그린다. 재배포하지 않으려고
-저장소에는 넣지 않았다. [JTBC 글꼴 배포처](https://www.jtbc.co.kr/fonts)에서
-받아 아래 자리에 두면 된다.
+본문은 **에이투지체 SemiBold**(`A2Z-SemiBold.ttf`)로 그린다. 22SUTO-A 와 같은
+것이다. 한글 11,172자를 모두 덮고 **굵기가 한 벌뿐**이라, 본문 어디에도 굵기를
+주지 않아야 이 한 벌이 그대로 나온다.
+
+재배포하지 않으려고 저장소에는 넣지 않았다. 아래 자리에 두면 된다.
 
 ```
-app/src/main/res/font/jtbc_regular.ttf
+app/src/main/res/font/a2z_semibold.ttf
 ```
 
 없어도 빌드는 되지만 기기 기본 글꼴로 그려진다
