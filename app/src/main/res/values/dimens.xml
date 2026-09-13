@@ -4,4 +4,8 @@
     <dimen name="gap">12dp</dimen>
     <dimen name="hairline">1.5dp</dimen>
     <dimen name="ui_text">13sp</dimen>
+    <dimen name="icon_box">56dp</dimen>
+    <dimen name="number_dp">12dp</dimen>
+    <!-- 칸 높이 — 손가락 자리(56dp)의 80% -->
+    <dimen name="row_touch">44.8dp</dimen>
 </resources>

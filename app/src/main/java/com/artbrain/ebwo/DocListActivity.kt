@@ -6,13 +6,17 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
+import android.util.TypedValue
+import android.view.Gravity
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.artbrain.ebwo.auth.DriveAuth
 import com.artbrain.ebwo.drive.DriveApi
 import com.artbrain.ebwo.store.Doc
 import com.artbrain.ebwo.store.DocStore
+import com.artbrain.ebwo.ui.Fonts
+import com.artbrain.ebwo.ui.Glyph
 import com.artbrain.ebwo.ui.Ink
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.MainScope
@@ -31,12 +35,15 @@ class DocListActivity : Activity() {
     private val scope = MainScope()
     private lateinit var store: DocStore
 
+    private lateinit var root: FrameLayout
+    private lateinit var box: View
+    private lateinit var title: TextView
     private lateinit var rows: LinearLayout
-    private lateinit var pageInfo: TextView
+    private lateinit var number: TextView
     private lateinit var empty: TextView
-    private lateinit var btnPrev: Button
-    private lateinit var btnNext: Button
-    private lateinit var btnRefresh: Button
+    private lateinit var btnPrev: TextView
+    private lateinit var btnNext: TextView
+    private lateinit var btnRefresh: TextView
 
     private var docs: List<Doc> = emptyList()
     private var page = 0
@@ -51,9 +58,12 @@ class DocListActivity : Activity() {
         setContentView(R.layout.activity_doclist)
         store = DocStore(this)
 
+        root = findViewById(R.id.root)
         rows = findViewById(R.id.rows)
-        pageInfo = findViewById(R.id.pageInfo)
+        number = findViewById(R.id.number)
         empty = findViewById(R.id.empty)
+        box = findViewById(R.id.box)
+        title = findViewById(R.id.title)
         btnPrev = findViewById(R.id.prev)
         btnNext = findViewById(R.id.next)
         btnRefresh = findViewById(R.id.refresh)
@@ -62,13 +72,24 @@ class DocListActivity : Activity() {
         btnNext.setOnClickListener { if (page < lastPage()) { page++; render() } }
         btnRefresh.setOnClickListener { refresh() }
 
+        // 이 화면의 글자는 모두 geist — 가는 이탤릭 Geist Mono.
+        geist(title, 20f)
+        geist(number, 14f)
+        geist(btnRefresh, 24f)
+        geist(btnPrev, 24f)
+        geist(btnNext, 24f)
+        // 제목과 새로고침만 20dp 올린다. 자리(칸 수·아래 줄)는 건드리지 않으려고
+        // 레이아웃이 아니라 그리는 위치만 옮긴다.
+        findViewById<View>(R.id.head).translationY = -Ink.dp(this, 20f)
+
+        root.post { sizeBox() }
+
         docs = store.loadIndex()
         pendingDocId = savedInstanceState?.getString(KEY_PENDING)
 
         // 한 쪽에 몇 칸이 들어가는지는 자리를 잡은 뒤에야 안다.
         rows.post {
-            val rowH = Ink.dp(this, Ink.TOUCH_DP).toInt()
-            perPage = max(1, rows.height / rowH)
+            perPage = max(1, rows.height / Ink.dp(this, ROW_DP).toInt())
             render()
             if (docs.isEmpty()) refresh()
         }
@@ -93,6 +114,30 @@ class DocListActivity : Activity() {
         super.onDestroy()
     }
 
+    /** 이 화면의 모든 글자에 쓰는 꼴 — 가는 이탤릭 Geist Mono. */
+    private fun geist(v: TextView, dp: Float) {
+        v.typeface = Fonts.of(this, Fonts.UI)
+        v.fontVariationSettings = "'wght' 100"
+        v.setTextSize(TypedValue.COMPLEX_UNIT_DIP, dp)
+        v.includeFontPadding = false
+        if (v is android.widget.Button) {
+            v.gravity = Gravity.CENTER
+            // 오른쪽 것들은 활용공간의 오른쪽 끝에, 왼쪽 것은 왼쪽 끝에 세운다.
+            val toStart = v.id == R.id.prev
+            v.post { Glyph.alignEdge(v, toStart) }
+        }
+    }
+
+    /** 활용공간 — 화면 가운데, 폭 60% · 높이 80%. 모든 것이 이 안에 든다. */
+    private fun sizeBox() {
+        if (root.width <= 0) return
+        (box.layoutParams as FrameLayout.LayoutParams).let {
+            it.width = (root.width * Ink.BOX_FRACTION).toInt()
+            it.height = (root.height * BOX_H).toInt()
+            box.layoutParams = it
+        }
+    }
+
     private fun lastPage() = max(0, (docs.size - 1) / perPage)
 
     private fun render() {
@@ -102,9 +147,11 @@ class DocListActivity : Activity() {
         showStatus()
 
         if (docs.isEmpty()) {
-            pageInfo.text = ""
+            number.text = ""
             btnPrev.isEnabled = false
             btnNext.isEnabled = false
+            btnPrev.alpha = DIM
+            btnNext.alpha = DIM
             return
         }
 
@@ -113,21 +160,33 @@ class DocListActivity : Activity() {
         val inflater = LayoutInflater.from(this)
         for (i in from until to) addRow(inflater, rows, docs[i])
 
-        pageInfo.text = "${page + 1} / ${lastPage() + 1}"
+        number.text = "${page + 1}/${lastPage() + 1}"
         btnPrev.isEnabled = page > 0
         btnNext.isEnabled = page < lastPage()
+        // 누를 수 없어도 지운 자리처럼 보이지 않게 옅게 남긴다 — 줄의 균형이
+        // 무너지지 않는다.
+        btnPrev.alpha = if (btnPrev.isEnabled) 1f else DIM
+        btnNext.alpha = if (btnNext.isEnabled) 1f else DIM
     }
 
     private fun addRow(inflater: LayoutInflater, parent: ViewGroup, doc: Doc) {
         val row = inflater.inflate(R.layout.row_doc, parent, false)
-        row.findViewById<TextView>(R.id.name).text = doc.name
+        row.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, Ink.dp(this, ROW_DP).toInt())
+        row.findViewById<TextView>(R.id.name).let {
+            it.text = doc.name
+            it.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f)
+            it.alpha = if (doc.cached) 1f else 0.55f
+        }
 
         val mark = row.findViewById<TextView>(R.id.mark)
-        val del = row.findViewById<Button>(R.id.del)
+        val del = row.findViewById<TextView>(R.id.del)
+        geist(mark, 14f)
+        geist(del, 20f)
 
         if (doc.cached) {
             val kb = (store.bodyBytes(doc.id) + 1023) / 1024
-            mark.text = "${kb}KB"
+            mark.text = "${kb}kb"
             del.visibility = View.VISIBLE
             del.setOnClickListener {
                 store.deleteBody(doc.id)
@@ -137,7 +196,7 @@ class DocListActivity : Activity() {
             }
         } else {
             mark.text = ""
-            del.visibility = View.GONE
+            del.visibility = View.INVISIBLE
         }
 
         row.setOnClickListener { open(doc) }
@@ -252,6 +311,15 @@ class DocListActivity : Activity() {
 
     private companion object {
         const val KEY_PENDING = "pendingDocId"
+
+        /** 활용공간의 세로 몫 — 가로는 [Ink.BOX_FRACTION] 을 쓴다. */
+        const val BOX_H = 0.80f
+
+        /** 누를 수 없는 화살표의 옅기 */
+        const val DIM = 0.5f
+
+        /** 칸 높이 — 손가락 자리(56dp)의 80% */
+        const val ROW_DP = Ink.TOUCH_DP * 0.8f
     }
 
     private fun showStatus() {
