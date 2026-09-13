@@ -131,6 +131,21 @@ class PageView @JvmOverloads constructor(
             .build()
     }
 
+    /** 지금 글줄 덩이의 위·아래 자리. 글이 없으면 null. */
+    val textTop: Float?
+        get() = layout?.let { (height - it.height) / 2f }
+
+    val textBottom: Float?
+        get() = layout?.let { (height - it.height) / 2f + it.height }
+
+    /** [x],[y] 가 글이 놓인 네모 안인가 — 상자 폭과 글줄 높이로 잰다. */
+    fun hitsText(x: Float, y: Float): Boolean {
+        val t = textTop ?: return false
+        val b = textBottom ?: return false
+        val left = (width - boxW) / 2f
+        return x >= left && x <= left + boxW && y >= t && y <= b
+    }
+
     /** 다음 쪽으로. 마지막이면 false. */
     fun next(): Boolean {
         if (page >= pages.size - 1) return false

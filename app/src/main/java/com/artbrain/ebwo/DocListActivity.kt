@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.artbrain.ebwo.auth.DriveAuth
 import com.artbrain.ebwo.drive.DriveApi
+import com.artbrain.ebwo.drive.Net
 import com.artbrain.ebwo.store.Doc
 import com.artbrain.ebwo.store.DocStore
 import com.artbrain.ebwo.ui.Fonts
@@ -233,8 +234,8 @@ class DocListActivity : Activity() {
                 render()
                 popup.show(
                     msg = "${doc.name}\n받아 둔 글을 지웠습니다.",
-                    actionLabel = "Undo",
-                    onAction = {
+                    undoLabel = "Undo",
+                    onUndo = {
                         store.restoreBody(doc.id)
                         docs = store.loadIndex()
                         render()
@@ -282,7 +283,7 @@ class DocListActivity : Activity() {
                 throw e
             } catch (e: Exception) {
                 if (isUnauthorized(e)) DriveAuth.forget()
-                say(e.message ?: "받지 못했습니다.")
+                say(Net.explain(this@DocListActivity, e, "글을 받지"))
             } finally {
                 busy = false
             }
@@ -333,6 +334,7 @@ class DocListActivity : Activity() {
     private var pendingDocId: String? = null
 
     private fun requestToken(forDoc: String?) {
+        if (!Net.online(this)) { say(Net.OFFLINE); return }
         pendingDocId = forDoc
         DriveAuth.request(this, onToken = { onToken(it) }, onError = { say(it) })
     }
@@ -355,9 +357,8 @@ class DocListActivity : Activity() {
     }
 
     private fun say(msg: String?) {
-        status = msg
-        showStatus()
-        if (msg != null && docs.isNotEmpty()) popup.show(msg)
+        if (msg == null) { status = null; showStatus(); return }
+        popup.show(msg)
     }
 
     private companion object {
@@ -377,7 +378,7 @@ class DocListActivity : Activity() {
     }
 
     private fun showStatus() {
-        val msg = status ?: when {
+        val msg = when {
             busy -> "받고 있습니다…"
             docs.isEmpty() -> "새로고침을 눌러 구글 문서를 받아오세요."
             else -> null

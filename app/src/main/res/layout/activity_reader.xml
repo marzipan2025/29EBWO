@@ -24,6 +24,17 @@
         android:paddingEnd="10dp"
         android:textColor="@android:color/black" />
 
+    <!-- 조작판이 꺼져 있을 때만 보이는 시계. 자리는 코드에서 잡는다. -->
+    <TextView
+        android:id="@+id/clock"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:alpha="0.7"
+        android:gravity="center_horizontal"
+        android:includeFontPadding="false"
+        android:textColor="@android:color/black" />
+
     <!-- 이전으로 갈 때만 잠깐 뜨는 표. 번호 바로 아래 가운데. -->
     <TextView
         android:id="@+id/backHint"

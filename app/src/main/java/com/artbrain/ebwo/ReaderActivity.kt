@@ -18,6 +18,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.artbrain.ebwo.auth.DriveAuth
 import com.artbrain.ebwo.drive.DriveApi
+import com.artbrain.ebwo.drive.Net
 import com.artbrain.ebwo.store.DocStore
 import com.artbrain.ebwo.ui.Fonts
 import com.artbrain.ebwo.ui.Glyph
@@ -65,6 +66,7 @@ class ReaderActivity : Activity() {
     private lateinit var pageView: PageView
     private lateinit var number: TextView
     private lateinit var backHint: TextView
+    private lateinit var clock: TextView
     private lateinit var toList: TextView
     private lateinit var refreshBtn: TextView
     private lateinit var timeline: TimelineView
@@ -97,6 +99,7 @@ class ReaderActivity : Activity() {
         pageView = findViewById(R.id.page)
         number = findViewById(R.id.number)
         backHint = findViewById(R.id.backHint)
+        clock = findViewById(R.id.clock)
         toList = findViewById(R.id.toList)
         refreshBtn = findViewById(R.id.refresh)
         timeline = findViewById(R.id.timeline)
@@ -115,6 +118,12 @@ class ReaderActivity : Activity() {
         // 곡선이 한 픽셀 아래로 내려가 끊겨 보인다 — 굵기 대신 크기로 푼다.
         backHint.setTextSize(TypedValue.COMPLEX_UNIT_DIP, HINT_DP)
         backHint.post { Glyph.centerVertical(backHint) }
+
+        // 시계는 번호와 같은 크기·굵기·색·옅기.
+        clock.typeface = Fonts.of(this, Fonts.UI)
+        clock.fontVariationSettings = Fonts.THIN
+        clock.setTextSize(TypedValue.COMPLEX_UNIT_DIP, NUMBER_DP)
+        clock.post { Glyph.centerVertical(clock) }
 
         // 화살표도 번호와 같은 가는 이탤릭으로. 누르는 자리(박스)는 그대로
         // 두고 글자만 키운다 — 손가락이 닿는 넓이는 지키면서 눈에는 크게.
@@ -187,8 +196,14 @@ class ReaderActivity : Activity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        tickClock()
+    }
+
     override fun onPause() {
         super.onPause()
+        hand.removeCallbacks(tick)
         if (pageView.pageCount > 0) store.savePos(docId, pageView.page)
     }
 
@@ -198,12 +213,24 @@ class ReaderActivity : Activity() {
         super.onDestroy()
     }
 
-    /** 위 [TOP_ZONE] = 조작판 토글, 그 아래는 왼쪽 [LEFT_ZONE] 이 이전·나머지가 다음 */
+    /**
+     * 누른 자리를 가린다. **글이 놓인 네모가 가장 먼저다** — 이전/다음 자리와
+     * 겹치는 데서는 글자 쪽이 이긴다. 읽다가 글을 짚는 것은 넘기려는 뜻이
+     * 아니기 때문이다.
+     *
+     * ```
+     * 글 네모      조작판 켜기
+     * 위 30%       조작판 토글
+     * 왼쪽 20%     이전 + 조작판 끄기
+     * 나머지       다음 + 조작판 끄기
+     * ```
+     */
     private fun onTap(x: Float, y: Float) {
-        if (y < root.height * TOP_ZONE) {
-            setUiVisible(!uiShown)
-            return
-        }
+        if (pageView.hitsText(x, y)) { setUiVisible(true); return }
+        if (y < root.height * TOP_ZONE) { setUiVisible(!uiShown); return }
+
+        // 넘길 때는 조작판을 치운다 — 읽는 자리를 가리지 않게.
+        setUiVisible(false)
         if (x < root.width * LEFT_ZONE) {
             goPrev()
         } else {
@@ -212,6 +239,23 @@ class ReaderActivity : Activity() {
     }
 
     private var flung = false
+
+    private val tick = Runnable { tickClock() }
+
+    /** 시계를 고쳐 쓰고 다음 분이 시작할 때 다시 부른다. */
+    private fun tickClock() {
+        hand.removeCallbacks(tick)
+        if (uiShown) return
+        val now = java.util.Calendar.getInstance()
+        clock.text = "%02d:%02d".format(
+            now.get(java.util.Calendar.HOUR_OF_DAY),
+            now.get(java.util.Calendar.MINUTE),
+        )
+        // 다음 분까지 남은 만큼만 기다린다 — 쓸데없이 깨우지 않는다.
+        val wait = 60_000L - (now.get(java.util.Calendar.SECOND) * 1000L +
+            now.get(java.util.Calendar.MILLISECOND))
+        hand.postDelayed(tick, wait)
+    }
 
     /** 이전 문장으로. 갈 수 있었으면 표를 잠깐 띄운다. */
     private fun goPrev() {
@@ -261,6 +305,12 @@ class ReaderActivity : Activity() {
                 Ink.dp(this, 6f).toInt()
             backHint.layoutParams = it
         }
+        // 시계는 **아래에서** 번호가 위에서 떨어진 만큼 떨어진다. 글 높이를
+        // 따르지 않으므로 문장을 넘겨도 제자리에 있는다.
+        (clock.layoutParams as FrameLayout.LayoutParams).let {
+            it.topMargin = (h * (1f - NUMBER_Y)).toInt() - clock.height / 2
+            clock.layoutParams = it
+        }
         (timeline.layoutParams as FrameLayout.LayoutParams).let {
             it.width = (root.width * TIMELINE_W).toInt()
             it.topMargin = (h * TIMELINE_Y).toInt() - timeline.height / 2
@@ -288,7 +338,9 @@ class ReaderActivity : Activity() {
         toList.visibility = v
         refreshBtn.visibility = v
         timeline.visibility = v
+        clock.visibility = if (show) View.INVISIBLE else View.VISIBLE
         uiShown = show
+        if (!show) tickClock()
         val sysBars = WindowInsetsCompat.Type.systemBars()
         if (show) bars.show(sysBars) else bars.hide(sysBars)
         hand.removeCallbacks(hideUi)
@@ -310,6 +362,7 @@ class ReaderActivity : Activity() {
     /** 이 문서의 글을 구글에서 다시 받는다. 읽던 자리는 지킨다. */
     private fun refresh() {
         if (busy || docId.isEmpty()) return
+        if (!Net.online(this)) { say(Net.OFFLINE); return }
         say("다시 받고 있습니다…")
         pending = { token ->
             scope.launch {
@@ -324,7 +377,7 @@ class ReaderActivity : Activity() {
                     throw e
                 } catch (e: Exception) {
                     if (e.message?.contains("인증이 만료") == true) DriveAuth.forget()
-                    say(e.message ?: "받지 못했습니다.")
+                    say(Net.explain(this@ReaderActivity, e, "글을 다시 받지"))
                 } finally {
                     busy = false
                 }
