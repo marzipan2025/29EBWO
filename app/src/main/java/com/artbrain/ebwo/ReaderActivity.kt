@@ -23,6 +23,7 @@ import com.artbrain.ebwo.ui.Fonts
 import com.artbrain.ebwo.ui.Glyph
 import com.artbrain.ebwo.ui.Ink
 import com.artbrain.ebwo.ui.PageView
+import com.artbrain.ebwo.ui.Popup
 import com.artbrain.ebwo.ui.Shade
 import com.artbrain.ebwo.ui.TimelineView
 import kotlin.math.abs
@@ -57,6 +58,7 @@ class ReaderActivity : Activity() {
 
     private val scope = MainScope()
     private val hand = Handler(Looper.getMainLooper())
+    private val popup by lazy { Popup(root) }
     private lateinit var store: DocStore
 
     private lateinit var root: FrameLayout
@@ -66,7 +68,6 @@ class ReaderActivity : Activity() {
     private lateinit var toList: TextView
     private lateinit var refreshBtn: TextView
     private lateinit var timeline: TimelineView
-    private lateinit var toast: TextView
 
     private lateinit var bars: WindowInsetsControllerCompat
     private var docId: String = ""
@@ -74,7 +75,6 @@ class ReaderActivity : Activity() {
     private var busy = false
 
     private val hideUi = Runnable { setUiVisible(false) }
-    private val hideToast = Runnable { toast.visibility = View.GONE }
     private val hideHint = Runnable { backHint.visibility = View.INVISIBLE }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -128,7 +128,6 @@ class ReaderActivity : Activity() {
             Shade.applyTo(b)
             b.post { Glyph.center(b) }
         }
-        toast = findViewById(R.id.toast)
 
         pageView.setFont((application as App).bodyFont)
         pageView.onPaginated = { updateChrome() }
@@ -344,12 +343,7 @@ class ReaderActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
     }
 
-    private fun say(msg: String) {
-        toast.text = msg
-        toast.visibility = View.VISIBLE
-        hand.removeCallbacks(hideToast)
-        hand.postDelayed(hideToast, TOAST_MS)
-    }
+    private fun say(msg: String) = popup.show(msg)
 
     companion object {
         const val EXTRA_ID = "id"
@@ -385,6 +379,5 @@ class ReaderActivity : Activity() {
         private const val TIMELINE_W = 0.45f
 
         private const val UI_TIMEOUT_MS = 5_000L
-        private const val TOAST_MS = 2_500L
     }
 }

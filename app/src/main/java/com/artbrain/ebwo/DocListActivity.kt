@@ -18,6 +18,7 @@ import com.artbrain.ebwo.store.DocStore
 import com.artbrain.ebwo.ui.Fonts
 import com.artbrain.ebwo.ui.Glyph
 import com.artbrain.ebwo.ui.Ink
+import com.artbrain.ebwo.ui.Popup
 import com.artbrain.ebwo.ui.Shade
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.MainScope
@@ -53,6 +54,7 @@ class DocListActivity : Activity() {
 
     /** 아래 상태줄에 띄울 말. null 이면 형편에 맞는 기본 말이 나온다. */
     private var status: String? = null
+    private val popup by lazy { Popup(root) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,20 +85,38 @@ class DocListActivity : Activity() {
         geist(btnRefresh, 24f)
         geist(btnPrev, 24f)
         geist(btnNext, 24f)
-        // 제목과 새로고침만 20dp 올린다. 자리(칸 수·아래 줄)는 건드리지 않으려고
+        // 제목과 새로고침만 올린다. 자리(칸 수·아래 줄)는 건드리지 않으려고
         // 레이아웃이 아니라 그리는 위치만 옮긴다.
-        findViewById<View>(R.id.head).translationY = -Ink.dp(this, 20f)
+        val headUp = Ink.dp(this, HEAD_UP_DP).toInt()
+        findViewById<View>(R.id.head).translationY = -headUp.toFloat()
+
+        // 머리를 올린 만큼 위 간격이 벌어진다. 칸 묶음을 그 **절반**만큼
+        // 올리면 위아래가 같아진다 — 위는 그만큼 줄고 아래는 그만큼 늘기
+        // 때문이다. 정수 픽셀로 민다.
+        rows.translationY = -(headUp / 2).toFloat()
 
         root.post { sizeBox() }
 
+        // 지난번에 치워 둔 것은 되돌릴 기회가 지났다. 여기서 쓸어 낸다.
+        store.purgeAll()
         docs = store.loadIndex()
         pendingDocId = savedInstanceState?.getString(KEY_PENDING)
 
         // 한 쪽에 몇 칸이 들어가는지는 자리를 잡은 뒤에야 안다.
-        rows.post {
-            perPage = max(1, rows.height / Ink.dp(this, ROW_DP).toInt())
+        // 통의 높이는 활용공간이 정해진 **뒤에야** 확정된다. 한 번만 재면
+        // 상자가 줄기 전의 큰 값을 잡아 칸이 커지고 아래 줄을 침범한다.
+        // 높이가 바뀔 때마다 다시 센다.
+        rows.viewTreeObserver.addOnGlobalLayoutListener {
+            val h = rows.height
+            if (h <= 0 || h == measuredRowsH) return@addOnGlobalLayoutListener
+            measuredRowsH = h
+            // 들어가는 만큼을 세어 칸 높이를 정하고(간격은 이 값으로 고정),
+            // 놓기는 하나 적게 한다 — 마지막 칸과 아래 줄 사이가 그만큼 뜬다.
+            val fit = max(1, h / Ink.dp(this, ROW_DP).toInt())
+            rowH = h / fit
+            perPage = fit
             render()
-            if (docs.isEmpty()) refresh()
+            if (docs.isEmpty() && !askedOnce) { askedOnce = true; refresh() }
         }
     }
 
@@ -147,10 +167,13 @@ class DocListActivity : Activity() {
         }
     }
 
-    /** 칸 하나의 높이 — 통을 [perPage] 로 정확히 나눈 값. 남는 자리가 없다. */
+    /** 칸 하나의 높이. 놓는 칸 수를 줄여도 이 값은 그대로다 — 간격이 안 변한다. */
+    private var rowH = 0
+    private var measuredRowsH = 0
+    private var askedOnce = false
+
     private fun rowPx(): Int =
-        if (perPage > 0 && rows.height > 0) rows.height / perPage
-        else Ink.dp(this, ROW_DP).toInt()
+        if (rowH > 0) rowH else Ink.dp(this, ROW_DP).toInt()
 
     private fun lastPage() = max(0, (docs.size - 1) / perPage)
 
@@ -205,10 +228,21 @@ class DocListActivity : Activity() {
             mark.text = "${kb}kb"
             del.visibility = View.VISIBLE
             del.setOnClickListener {
-                store.deleteBody(doc.id)
+                if (!store.deleteBody(doc.id)) return@setOnClickListener
                 docs = store.loadIndex()
                 render()
-                say("${doc.name} — 받아 둔 글을 지웠습니다.")
+                popup.show(
+                    msg = "${doc.name}\n받아 둔 글을 지웠습니다.",
+                    actionLabel = "Undo",
+                    onAction = {
+                        store.restoreBody(doc.id)
+                        docs = store.loadIndex()
+                        render()
+                    },
+                    // 되돌리지 않고 시간이 다 되면 그때 정말 지운다.
+                    onExpire = { store.purge(doc.id) },
+                    ms = Popup.UNDO_MS,
+                )
             }
         } else {
             mark.text = ""
@@ -323,10 +357,14 @@ class DocListActivity : Activity() {
     private fun say(msg: String?) {
         status = msg
         showStatus()
+        if (msg != null && docs.isNotEmpty()) popup.show(msg)
     }
 
     private companion object {
         const val KEY_PENDING = "pendingDocId"
+
+        /** 제목·새로고침을 올리는 높이 */
+        const val HEAD_UP_DP = 20f
 
         /** 활용공간의 세로 몫 — 가로는 [Ink.BOX_FRACTION] 을 쓴다. */
         const val BOX_H = 0.80f

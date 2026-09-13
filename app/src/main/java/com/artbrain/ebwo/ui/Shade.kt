@@ -31,11 +31,13 @@ class Shade(private val owner: TextView) : Drawable() {
         paint.color = Ink.BLACK
         paint.alpha = 255
 
-        val advance = paint.measureText(BLOCK)
+        val blocks = BLOCK.repeat(owner.text?.length ?: 0)
+        if (blocks.isEmpty()) return
+        val advance = paint.measureText(blocks)
         val fm = paint.fontMetrics
         val x = b.left + (b.width() - advance) / 2f
         val y = b.top + (b.height() - (fm.descent - fm.ascent)) / 2f - fm.ascent
-        canvas.drawText(BLOCK, x, y, paint)
+        canvas.drawText(blocks, x, y, paint)
     }
 
     override fun setAlpha(alpha: Int) = Unit
