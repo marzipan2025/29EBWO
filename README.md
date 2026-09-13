@@ -98,6 +98,22 @@ JVM 에서 그대로 시험한다.
 kotlinc -include-runtime -d t.jar app/src/main/java/com/artbrain/ebwo/text/*.kt Test.kt
 ```
 
+## 글리프를 다루는 두 가지 함정
+
+**가로는 `translationX` 로 옮기지 않는다.** 뷰를 옆으로 밀면 그만큼 반대쪽
+여백이 잘려 글리프 끝이 날아간다. `wrap_content` 는 글자 폭(advance)에 딱
+맞춰지는데 이탤릭 글리프의 먹은 그 폭을 넘어서므로, 밀면 바로 잘린다.
+패딩을 줘도 translation 이 그걸 먹는다. 그래서 가로 가운데는 `match_parent`
+＋ `gravity` 에 맡기고, `Glyph.centerVertical` 로 세로만 맞춘다.
+
+가장자리에 세워야 하는 단추만 `Glyph.alignEdge` 로 먹의 끝을 재어 붙인다.
+그러지 않으면 글리프가 활용공간 안쪽으로 들어가, 그 줄만 한쪽으로 쏠려 보인다.
+
+**누름 표시는 `░` 한 글자다.** 기호도 `░` 도 같은 글꼴의 한 글자이므로 같은
+크기·같은 자리에 겹쳐 놓으면 글자 뒤에 성긴 점무늬가 깔린 꼴이 된다
+(`Shade`). 네모를 칠하지 않는다 — e-ink 에서 면이 나타났다 사라지는 것은
+요란하다.
+
 ## 회색은 하프톤으로
 
 `Halftone` 이 4×4 베이어 무늬로 중간 밝기를 낸다. **무늬는 dp 가 아니라 화면
@@ -113,9 +129,9 @@ kotlinc -include-runtime -d t.jar app/src/main/java/com/artbrain/ebwo/text/*.kt 
 찾기 때문에 **글꼴이 하나도 없어도 빌드는 된다.**
 
 ```
-app/src/main/res/font/jtbc_regular.ttf       본문(한글). JTBC 명조
+app/src/main/res/font/a2z_regular.ttf        본문(한글). 에이투지체 Regular
 app/src/main/res/font/geist_mono_italic.ttf  번호·화살표. Geist Mono Italic
-app/src/main/res/font/a2z_semibold.ttf       본문 대안. 에이투지체 (22SUTO-A 와 같은 것)
+app/src/main/res/font/geist_mono.ttf         제목. 기울이지 않은 Geist Mono
 ```
 
 본문 글꼴은 `Fonts.BODY` 한 줄로 갈아 끼운다. Geist Mono 는 가변 글꼴이라

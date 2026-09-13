@@ -13,11 +13,20 @@ import androidx.core.content.res.ResourcesCompat
  * 그래야 받자마자 빌드가 된다.
  */
 object Fonts {
-    /** 본문 — 한글. 없으면 기기 기본 글꼴. */
-    const val BODY = "jtbc_regular"
+    /** 본문 — 한글. 에이투지체 Regular. 없으면 기기 기본 글꼴. */
+    const val BODY = "a2z_regular"
 
     /** 번호·화살표 — Geist Mono 의 가는 이탤릭. */
     const val UI = "geist_mono_italic"
+
+    /** 제목 — 같은 Geist Mono 이되 기울이지 않은 것. */
+    const val UI_UPRIGHT = "geist_mono"
+
+    /** 가는 굵기 — 번호·화살표에 쓴다. */
+    const val THIN = "'wght' 100"
+
+    /** 보통 굵기 — 제목에 쓴다. */
+    const val REGULAR = "'wght' 400"
 
     private val cache = HashMap<String, Typeface>()
 

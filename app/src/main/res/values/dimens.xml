@@ -8,4 +8,7 @@
     <dimen name="number_dp">12dp</dimen>
     <!-- 칸 높이 — 손가락 자리(56dp)의 80% -->
     <dimen name="row_touch">44.8dp</dimen>
+    <!-- 하단 화살표의 누르는 자리. 글리프는 가장자리에 서지만 손가락은
+         안쪽까지 넓게 받는다 — 보이는 곳과 눌리는 곳이 어긋나 잘 안 눌렸다. -->
+    <dimen name="arrow_touch">104dp</dimen>
 </resources>

@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -22,7 +23,9 @@ import com.artbrain.ebwo.ui.Fonts
 import com.artbrain.ebwo.ui.Glyph
 import com.artbrain.ebwo.ui.Ink
 import com.artbrain.ebwo.ui.PageView
+import com.artbrain.ebwo.ui.Shade
 import com.artbrain.ebwo.ui.TimelineView
+import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
@@ -59,6 +62,7 @@ class ReaderActivity : Activity() {
     private lateinit var root: FrameLayout
     private lateinit var pageView: PageView
     private lateinit var number: TextView
+    private lateinit var backHint: TextView
     private lateinit var toList: TextView
     private lateinit var refreshBtn: TextView
     private lateinit var timeline: TimelineView
@@ -71,6 +75,7 @@ class ReaderActivity : Activity() {
 
     private val hideUi = Runnable { setUiVisible(false) }
     private val hideToast = Runnable { toast.visibility = View.GONE }
+    private val hideHint = Runnable { backHint.visibility = View.INVISIBLE }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,24 +96,36 @@ class ReaderActivity : Activity() {
         root = findViewById(R.id.root)
         pageView = findViewById(R.id.page)
         number = findViewById(R.id.number)
+        backHint = findViewById(R.id.backHint)
         toList = findViewById(R.id.toList)
         refreshBtn = findViewById(R.id.refresh)
         timeline = findViewById(R.id.timeline)
 
         // 번호는 Geist Mono 의 가는 이탤릭. 가변 폰트라 굵기 축을 100 으로 세운다.
         number.typeface = Fonts.of(this, Fonts.UI)
-        number.fontVariationSettings = "'wght' 100"
-        number.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f)
+        number.fontVariationSettings = Fonts.THIN
+        number.setTextSize(TypedValue.COMPLEX_UNIT_DIP, NUMBER_DP)
+        // 번호도 먹 자리로 가운데를 잡아야 화살표와 눈으로 줄이 맞는다.
+        number.post { Glyph.centerVertical(number) }
+
+        // 이전으로 갈 때 뜨는 표 — 번호와 같은 글자·같은 크기.
+        backHint.typeface = Fonts.of(this, Fonts.UI)
+        backHint.fontVariationSettings = Fonts.THIN
+        // 번호보다 크게 잡는다. 14dp 가는 굵기로는 이 글자의 완만한 오른쪽
+        // 곡선이 한 픽셀 아래로 내려가 끊겨 보인다 — 굵기 대신 크기로 푼다.
+        backHint.setTextSize(TypedValue.COMPLEX_UNIT_DIP, HINT_DP)
+        backHint.post { Glyph.centerVertical(backHint) }
 
         // 화살표도 번호와 같은 가는 이탤릭으로. 누르는 자리(박스)는 그대로
         // 두고 글자만 키운다 — 손가락이 닿는 넓이는 지키면서 눈에는 크게.
         val geistItalic = Fonts.of(this, Fonts.UI)
         for (b in listOf(toList, refreshBtn)) {
             b.typeface = geistItalic
-            b.fontVariationSettings = "'wght' 100"
+            b.fontVariationSettings = Fonts.THIN
             b.setTextSize(TypedValue.COMPLEX_UNIT_DIP, GLYPH_DP)
             b.includeFontPadding = false
             b.gravity = Gravity.CENTER
+            Shade.applyTo(b)
             b.post { Glyph.center(b) }
         }
         toast = findViewById(R.id.toast)
@@ -134,8 +151,30 @@ class ReaderActivity : Activity() {
         }
         root.post { placeByRatio() }
 
+        // 왼쪽에서 오른쪽으로 쓸면 이전 문장. 화면 **왼쪽 가장자리**에서 시작한
+        // 쓸기는 안드로이드의 뒤로가기 제스처가 먼저 가져가므로, 가장자리에서
+        // 조금 떨어진 데서 시작해야 이 앱까지 온다.
+        val swipe = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onFling(
+                e1: MotionEvent?, e2: MotionEvent, vx: Float, vy: Float,
+            ): Boolean {
+                if (e1 == null) return false
+                val dx = e2.x - e1.x
+                val dy = e2.y - e1.y
+                val far = dx > Ink.dp(this@ReaderActivity, SWIPE_MIN_DP)
+                val flat = abs(dx) > abs(dy) * 2
+                if (far && flat) { goPrev(); flung = true; return true }
+                return false
+            }
+        })
+
         root.setOnTouchListener { _, e ->
-            if (e.actionMasked == MotionEvent.ACTION_UP) onTap(e.x, e.y)
+            swipe.onTouchEvent(e)
+            if (e.actionMasked == MotionEvent.ACTION_UP) {
+                // 쓸어 넘긴 뒤 손을 뗀 것은 누름으로 세지 않는다.
+                if (!flung) onTap(e.x, e.y)
+                flung = false
+            }
             true
         }
 
@@ -167,10 +206,26 @@ class ReaderActivity : Activity() {
             return
         }
         if (x < root.width * LEFT_ZONE) {
-            if (pageView.prev()) afterTurn() else say("첫 문장입니다.")
+            goPrev()
         } else {
             if (pageView.next()) afterTurn() else say("마지막 문장입니다.")
         }
+    }
+
+    private var flung = false
+
+    /** 이전 문장으로. 갈 수 있었으면 표를 잠깐 띄운다. */
+    private fun goPrev() {
+        if (!pageView.prev()) { say("첫 문장입니다."); return }
+        afterTurn()
+        showBackHint()
+    }
+
+    /** 번호 바로 아래에 ↩ 를 잠깐 띄운다 — 뒤로 갔음을 알리는 표. */
+    private fun showBackHint() {
+        backHint.visibility = View.VISIBLE
+        hand.removeCallbacks(hideHint)
+        hand.postDelayed(hideHint, HINT_MS)
     }
 
     private fun afterTurn() {
@@ -201,6 +256,11 @@ class ReaderActivity : Activity() {
         (number.layoutParams as FrameLayout.LayoutParams).let {
             it.topMargin = (h * NUMBER_Y).toInt() - number.height / 2
             number.layoutParams = it
+        }
+        (backHint.layoutParams as FrameLayout.LayoutParams).let {
+            it.topMargin = (h * NUMBER_Y).toInt() + number.height / 2 +
+                Ink.dp(this, 6f).toInt()
+            backHint.layoutParams = it
         }
         (timeline.layoutParams as FrameLayout.LayoutParams).let {
             it.width = (root.width * TIMELINE_W).toInt()
@@ -305,6 +365,18 @@ class ReaderActivity : Activity() {
 
         /** 화살표 글리프 크기 */
         private const val GLYPH_DP = 32f
+
+        /** 문장 번호와 뒤로 표의 크기 */
+        private const val NUMBER_DP = 14f
+
+        /** 뒤로 표의 크기 */
+        private const val HINT_DP = 20f
+
+        /** 뒤로 표가 머무는 동안 */
+        private const val HINT_MS = 1_000L
+
+        /** 이 거리 넘게 오른쪽으로 쓸면 이전으로 본다 */
+        private const val SWIPE_MIN_DP = 48f
 
         /** 타임라인이 놓이는 자리와 폭 */
         /** 아래에서 15% 자리 */

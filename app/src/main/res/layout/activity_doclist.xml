@@ -35,11 +35,11 @@
                 android:layout_width="@dimen/touch"
                 android:layout_height="match_parent"
                 android:layout_gravity="end"
-                android:background="@drawable/btn_ghost"
-                android:contentDescription="새로고침"
+                        android:background="@null"
+        android:contentDescription="새로고침"
                 android:stateListAnimator="@null"
                 android:text="&#x21A9;"
-                android:textColor="@android:color/black" />
+                android:textColor="@color/ink_press" />
         </FrameLayout>
 
         <LinearLayout
@@ -56,14 +56,14 @@
 
             <Button
                 android:id="@+id/prev"
-                android:layout_width="@dimen/touch"
+                android:layout_width="@dimen/arrow_touch"
                 android:layout_height="match_parent"
                 android:layout_gravity="start"
-                android:background="@drawable/btn_ghost"
-                android:contentDescription="이전"
+                        android:background="@null"
+        android:contentDescription="이전"
                 android:stateListAnimator="@null"
                 android:text="&#x2190;"
-                android:textColor="@android:color/black" />
+                android:textColor="@color/ink_press" />
 
             <TextView
                 android:id="@+id/number"
@@ -75,14 +75,14 @@
 
             <Button
                 android:id="@+id/next"
-                android:layout_width="@dimen/touch"
+                android:layout_width="@dimen/arrow_touch"
                 android:layout_height="match_parent"
                 android:layout_gravity="end"
-                android:background="@drawable/btn_ghost"
-                android:contentDescription="다음"
+                        android:background="@null"
+        android:contentDescription="다음"
                 android:stateListAnimator="@null"
                 android:text="&#x2192;"
-                android:textColor="@android:color/black" />
+                android:textColor="@color/ink_press" />
         </FrameLayout>
     </LinearLayout>
 
@@ -93,7 +93,7 @@
         android:layout_gravity="center"
         android:gravity="center"
         android:padding="@dimen/gap"
-        android:textColor="@android:color/black"
+        android:textColor="@color/ink_press"
         android:textSize="13sp"
         android:visibility="gone" />
 </FrameLayout>

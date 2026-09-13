@@ -18,6 +18,7 @@ import com.artbrain.ebwo.store.DocStore
 import com.artbrain.ebwo.ui.Fonts
 import com.artbrain.ebwo.ui.Glyph
 import com.artbrain.ebwo.ui.Ink
+import com.artbrain.ebwo.ui.Shade
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
@@ -73,7 +74,11 @@ class DocListActivity : Activity() {
         btnRefresh.setOnClickListener { refresh() }
 
         // 이 화면의 글자는 모두 geist — 가는 이탤릭 Geist Mono.
-        geist(title, 20f)
+        // 제목만 기울이지 않은 보통 굵기로.
+        title.typeface = Fonts.of(this, Fonts.UI_UPRIGHT)
+        title.fontVariationSettings = Fonts.REGULAR
+        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20f)
+        title.includeFontPadding = false
         geist(number, 14f)
         geist(btnRefresh, 24f)
         geist(btnPrev, 24f)
@@ -117,11 +122,15 @@ class DocListActivity : Activity() {
     /** 이 화면의 모든 글자에 쓰는 꼴 — 가는 이탤릭 Geist Mono. */
     private fun geist(v: TextView, dp: Float) {
         v.typeface = Fonts.of(this, Fonts.UI)
-        v.fontVariationSettings = "'wght' 100"
+        v.fontVariationSettings = Fonts.THIN
         v.setTextSize(TypedValue.COMPLEX_UNIT_DIP, dp)
         v.includeFontPadding = false
+        // TextView 는 가로를 gravity 에 맡기고 세로만 먹 기준으로 맞춘다.
+        // translationX 를 걸면 그만큼 반대쪽 여백이 잘려 글리프 끝이 날아간다.
+        if (v !is android.widget.Button) v.post { Glyph.centerVertical(v) }
         if (v is android.widget.Button) {
             v.gravity = Gravity.CENTER
+            Shade.applyTo(v)
             // 오른쪽 것들은 활용공간의 오른쪽 끝에, 왼쪽 것은 왼쪽 끝에 세운다.
             val toStart = v.id == R.id.prev
             v.post { Glyph.alignEdge(v, toStart) }
@@ -137,6 +146,11 @@ class DocListActivity : Activity() {
             box.layoutParams = it
         }
     }
+
+    /** 칸 하나의 높이 — 통을 [perPage] 로 정확히 나눈 값. 남는 자리가 없다. */
+    private fun rowPx(): Int =
+        if (perPage > 0 && rows.height > 0) rows.height / perPage
+        else Ink.dp(this, ROW_DP).toInt()
 
     private fun lastPage() = max(0, (docs.size - 1) / perPage)
 
@@ -171,8 +185,10 @@ class DocListActivity : Activity() {
 
     private fun addRow(inflater: LayoutInflater, parent: ViewGroup, doc: Doc) {
         val row = inflater.inflate(R.layout.row_doc, parent, false)
+        // 칸이 통을 빈틈없이 나눠 갖게 한다 — 칸 사이에 죽은 자리가 남으면
+        // 거기를 눌러도 아무 일이 없어 "안 눌린다" 로 느껴진다.
         row.layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, Ink.dp(this, ROW_DP).toInt())
+            LinearLayout.LayoutParams.MATCH_PARENT, rowPx())
         row.findViewById<TextView>(R.id.name).let {
             it.text = doc.name
             it.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f)

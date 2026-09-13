@@ -34,6 +34,15 @@ object Glyph {
         b.translationX = if (toStart) -inkLeft else b.width - inkRight
     }
 
+    /** 세로만 먹 기준으로 맞춘다. 가로는 뷰의 gravity 에 맡길 때 쓴다. */
+    fun centerVertical(b: TextView) {
+        val t = b.text?.toString().orEmpty()
+        if (t.isEmpty()) return
+        b.paint.getTextBounds(t, 0, t.length, r)
+        val fm = b.paint.fontMetrics
+        b.translationY = (fm.ascent + fm.descent) / 2f - (r.top + r.bottom) / 2f
+    }
+
     fun center(b: TextView) {
         val t = b.text?.toString().orEmpty()
         if (t.isEmpty()) return

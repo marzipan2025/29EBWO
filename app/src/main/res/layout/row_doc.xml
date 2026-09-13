@@ -27,10 +27,10 @@
         android:id="@+id/del"
         android:layout_width="@dimen/row_touch"
         android:layout_height="match_parent"
-        android:background="@drawable/btn_ghost"
+        android:background="@null"
         android:contentDescription="지움"
         android:stateListAnimator="@null"
         android:text="&#x00D7;"
-        android:textColor="@android:color/black"
+        android:textColor="@color/ink_press"
         android:visibility="invisible" />
 </LinearLayout>
