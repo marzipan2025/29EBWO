@@ -22,8 +22,8 @@ android {
         applicationId = "com.artbrain.ebwo"
         minSdk = 30        // Poke4 Lite = Android 11
         targetSdk = 36
-        versionCode = 12
-        versionName = "0.2.3"
+        versionCode = 13
+        versionName = "0.2.4"
     }
 
     signingConfigs {

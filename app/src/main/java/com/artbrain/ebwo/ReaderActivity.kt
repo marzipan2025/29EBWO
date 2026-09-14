@@ -145,7 +145,14 @@ class ReaderActivity : Activity() {
             b.includeFontPadding = false
             b.gravity = Gravity.CENTER
             Shade.applyTo(b)
-            b.post { Glyph.center(b) }
+            // 먹의 바깥 끝을 글 상자(화면 폭 60%)의 끝에 세운다 — 목록의 이름과
+            // 새로고침이 서는 폭과 같다. 화면이 길쭉한 기기에서도 안쪽으로 몰리지
+            // 않는다. 단추는 처음에 GONE 이라 폭이 없으므로 자리가 잡힐 때마다 잰다.
+            b.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                Glyph.alignEdge(v as TextView, toStart = v === toList)
+                // 시각 보정 — ↩ 는 먹이 위로 쏠려 보여 ↰ 보다 떠 보인다.
+                if (v === refreshBtn) v.translationY += Ink.dp(this, REFRESH_NUDGE_DP)
+            }
         }
 
         pageView.setFont((application as App).bodyFont)
@@ -347,16 +354,16 @@ class ReaderActivity : Activity() {
     private fun placeByRatio() {
         val h = root.height
         if (h <= 0) return
-        // 단추는 번호와 세로 가운데를 맞춘다. 그 자리에서 위까지의 거리를
-        // 그대로 좌우 벽과의 거리로도 쓴다 — 위·옆 간격이 같아 모서리에
-        // 매달린 느낌이 사라진다.
+        // 단추는 번호와 세로 가운데를 맞춘다. 가로는 글 상자의 양 끝이다
+        // (먹의 끝을 맞추는 것은 [Glyph.alignEdge]).
         val boxH = toList.height.takeIf { it > 0 } ?: Ink.dp(this, 56f).toInt()
         val topM = ((h * NUMBER_Y).toInt() - boxH / 2).coerceAtLeast(barTop)
+        val side = ((root.width - root.width * Ink.BOX_FRACTION) / 2).toInt()
         for (b in listOf(toList, refreshBtn)) {
             (b.layoutParams as FrameLayout.LayoutParams).let {
                 it.topMargin = topM
-                it.marginStart = topM
-                it.marginEnd = topM
+                it.marginStart = side
+                it.marginEnd = side
                 b.layoutParams = it
             }
         }
@@ -490,6 +497,9 @@ class ReaderActivity : Activity() {
 
         /** 문장 번호가 놓이는 자리 — 화면 위에서 이 비율 */
         private const val NUMBER_Y = Ink.EDGE_Y
+
+        /** 새로고침 ↩ 를 내리는 시각 보정 */
+        private const val REFRESH_NUDGE_DP = 2f
 
         /** 화살표 글리프 크기 */
         private const val GLYPH_DP = 32f

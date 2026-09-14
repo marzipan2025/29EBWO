@@ -16,7 +16,7 @@ import android.widget.FrameLayout
 import java.util.Calendar
 
 /**
- * 정각과 10분마다 **글자 뒤로 큰 시각을 2초 띄웠다가 걷고, 0.1초 뒤 화면을 한 번
+ * 정각과 10분마다 **글자 뒤로 큰 시각을 1.5초 띄웠다가 걷고, 0.1초 뒤 화면을 한 번
  * 크게 고친다.**
  *
  * e-ink 는 빠른 부분 갱신만 거듭하면 잔상이 쌓인다. 전체 갱신(GC16)은 화면이
@@ -124,7 +124,7 @@ class Chime(private val activity: Activity, private val root: FrameLayout) {
         /** 몇 분마다 — 정각과 매 10분 */
         const val EVERY_MIN = 10
         /** 떠 있는 시간 */
-        const val SHOW_MS = 2_000L
+        const val SHOW_MS = 1_500L
         /** 걷은 뒤 전체 갱신까지 */
         const val REFRESH_DELAY_MS = 100L
         /** 분이 바뀐 뒤 이만큼 넘어 받은 신호는 넘긴다 */
