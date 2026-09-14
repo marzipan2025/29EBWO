@@ -21,6 +21,7 @@ import com.artbrain.ebwo.store.Doc
 import com.artbrain.ebwo.store.DocStore
 import com.artbrain.ebwo.store.Fetch
 import com.artbrain.ebwo.ui.Chime
+import com.artbrain.ebwo.ui.Eink
 import com.artbrain.ebwo.ui.Fonts
 import com.artbrain.ebwo.ui.Glyph
 import com.artbrain.ebwo.ui.Ink
@@ -66,6 +67,7 @@ class DocListActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_doclist)
+        Eink.applyTheme(this)
         store = DocStore(this)
 
         // 리더처럼 시스템 막대를 걷는다. 쓸어내릴 때만 잠깐 나온다. 활용공간은

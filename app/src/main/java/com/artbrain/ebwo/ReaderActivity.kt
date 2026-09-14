@@ -26,6 +26,7 @@ import com.artbrain.ebwo.drive.Net
 import com.artbrain.ebwo.store.DocStore
 import com.artbrain.ebwo.store.Fetch
 import com.artbrain.ebwo.ui.Chime
+import com.artbrain.ebwo.ui.Eink
 import com.artbrain.ebwo.ui.Fonts
 import com.artbrain.ebwo.ui.Glyph
 import com.artbrain.ebwo.ui.Ink
@@ -89,6 +90,7 @@ class ReaderActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_reader)
+        Eink.applyTheme(this)
         store = DocStore(this)
 
         // 글만 남기려면 시스템 막대도 함께 물러나야 한다. 조작판과 같이 움직인다.

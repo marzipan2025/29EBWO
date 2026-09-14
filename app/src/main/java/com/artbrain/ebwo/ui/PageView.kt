@@ -48,7 +48,12 @@ class PageView @JvmOverloads constructor(
     private var layout: StaticLayout? = null
     private var imageDir: java.io.File? = null
     private var bitmap: Bitmap? = null
-    private val bitmapPaint = Paint().apply { isFilterBitmap = false; isAntiAlias = false }
+    private val bitmapPaint = Paint().apply {
+        isFilterBitmap = false
+        isAntiAlias = false
+        // e-ink 가 아니면 창이 통째로 뒤집히므로 사진만 미리 한 번 뒤집어 둔다.
+        colorFilter = Eink.photoFilter
+    }
     private var pendingRestore = 0
 
     /** 글 상자의 크기 — 화면 가운데 [Ink.BOX_FRACTION] 만큼 */
