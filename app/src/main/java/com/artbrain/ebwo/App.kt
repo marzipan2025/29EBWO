@@ -3,8 +3,15 @@ package com.artbrain.ebwo
 import android.app.Application
 import android.graphics.Typeface
 import com.artbrain.ebwo.ui.Fonts
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 
 class App : Application() {
+
+    override fun onCreate() {
+        super.onCreate()
+        // PdfBox 가 글꼴·인코딩 표를 APK 의 assets 에서 찾도록 알려 준다.
+        PDFBoxResourceLoader.init(this)
+    }
 
     /**
      * 본문 글꼴 — JTBC 명조.

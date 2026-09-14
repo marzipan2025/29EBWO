@@ -107,6 +107,8 @@ class DocListActivity : Activity() {
 
         // 지난번에 치워 둔 것은 되돌릴 기회가 지났다. 여기서 쓸어 낸다.
         store.purgeAll()
+        // 지난번 업데이트로 받은 APK 도 설치가 끝났으면 치운다.
+        Updater.cleanup(this, BuildConfig.VERSION_NAME)
         docs = store.loadIndex()
         pendingDocId = savedInstanceState?.getString(KEY_PENDING)
 
@@ -475,7 +477,7 @@ class DocListActivity : Activity() {
         val msg = when {
             // 목록이 있으면 받는 중인 것은 팝업이 알린다. 칸 위에 겹쳐 쓰지 않는다.
             busy && docs.isEmpty() -> "받고 있습니다…"
-            docs.isEmpty() -> "새로고침을 눌러 구글 문서와 epub 을 받아오세요."
+            docs.isEmpty() -> "새로고침을 눌러 구글 문서와 파일을 받아오세요.\nepub · pdf · docx · txt · md · srt"
             else -> null
         }
         empty.text = msg.orEmpty()

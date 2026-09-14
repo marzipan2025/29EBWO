@@ -1,6 +1,6 @@
 # 29EBWO
 
-구글 드라이브의 구글 문서와 epub 을 **한 문장씩 한 페이지에** 보여 주는 e-ink 뷰어.
+구글 드라이브의 구글 문서·epub·pdf·docx·txt·md·srt 를 **한 문장씩 한 페이지에** 보여 주는 e-ink 뷰어.
 **Boox Poke4 Lite 한 대만을 위한** 개인용 앱이다.
 
 ```
@@ -67,6 +67,29 @@ Android 11 (API 30)  ·  arm64-v8a  ·  Kotlin + View/Canvas
 
 글리프는 `Glyph` 가 **먹의 실제 자리를 재어** 네모 한가운데나 활용공간
 가장자리에 맞춘다. 글자 상자 기준으로 두면 화살표가 치우쳐 보인다.
+
+## pdf · docx · txt · md · srt
+
+드라이브에서 파일을 그대로 받아(`files.get?alt=media`) 기기에서 글로 푼다(`Fetch.plain`).
+푸는 일은 `text/Convert.kt` — **30EBSE 와 같은 파일**이다(패키지 이름만 다르다). 한쪽을
+고치면 다른 쪽에도 옮긴다.
+
+- **한글 인코딩** — BOM → 흠 없는 UTF-8 → 표 없는 UTF-16 → juniversalchardet → MS949·EUC-KR
+  차례로 보고, 풀린 글이 사람 글로 보이는지까지 확인한다. epub 속 XHTML 도 `encoding="euc-kr"`
+  선언을 믿되 틀리면 알아맞힌다.
+- **docx** — 문단(`w:p`)마다 한 줄. 줄마다 Enter 친 문서도 `Sentences` 가 문장을 잇는다.
+- **md** — 문법을 걷고, 제목·목록 줄은 제 문단.
+- **srt** — 번호·시각을 걷고 **자막 한 칸이 한 문단**. 한국어 자막은 마침표가 거의 없어 칸을
+  이으면 대사 여럿이 한 문장이 된다.
+- **목록** — md·srt 는 드라이브가 `application/octet-stream` 으로 두는 일이 많아 그 종류도
+  묻고 확장자로 거른다. 이름에는 확장자를 남긴다(epub 만 뗀다) — 같은 이름의 구글 문서와
+  docx 를 가르려고.
+- **pdf** — PdfBox-Android 로 글만 뽑고 종이 폭에서 끊긴 줄을 잇는다(`text/Pdf.kt`, 30EBSE 와 같다).
+- **곁다리 파일은 목록에서 뺀다** — 폰트·앱 묶음에 딸린 readme·license·changelog·OFL·FONTLOG,
+  폰트 도구 설정(maker·count·metrics…), `.log`, 이름이 깨진 파일. 드라이브의 파일은 건드리지 않는다
+  (`DriveApi.isClutter`).
+- **시험** — `./gradlew testDebugUnitTest`. 안드로이드 정규식(ICU)은 JVM 보다 엄격하므로 식을
+  고쳤으면 30EBSE 의 기기 시험(`ConvertDeviceTest`)도 돌린다.
 
 ## 글이 놓이는 자리
 
@@ -234,8 +257,8 @@ app/src/main/res/font/geist_mono.ttf         제목. 기울이지 않은 Geist M
 
 ```
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
-./gradlew :app:assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
 adb shell pm enable com.artbrain.ebwo      # ← 빠뜨리면 안 된다
 ```
 
@@ -268,11 +291,12 @@ an app` 을 꺼야 한다.** 켜져 있으면 구글 승낙 화면이 앞에 뜨
 keytool -list -v -keystore ~/.android/debug.keystore -storepass android | grep SHA1
 ```
 
-**릴리스** — 버전은 `app/build.gradle.kts` 의 versionCode/versionName 하나다.
+**릴리스** — 0.2.10 부터 정식 빌드(R8 줄이기)를 올린다. 서명은 여전히 디버그 키라 이전
+판 위에 그대로 덮어 설치된다. 버전은 `app/build.gradle.kts` 의 versionCode/versionName 하나다.
 
 ```
-./gradlew :app:assembleDebug
-cp app/build/outputs/apk/debug/app-debug.apk /tmp/29EBWO-X.Y.Z.apk
+./gradlew :app:assembleRelease
+cp app/build/outputs/apk/release/app-release.apk /tmp/29EBWO-X.Y.Z.apk
 git tag vX.Y.Z && git push origin vX.Y.Z
 gh release create vX.Y.Z /tmp/29EBWO-X.Y.Z.apk -t "29EBWO X.Y.Z" -n "변경 요약"
 ```

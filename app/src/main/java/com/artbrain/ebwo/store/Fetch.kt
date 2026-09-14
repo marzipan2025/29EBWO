@@ -9,6 +9,7 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import com.artbrain.ebwo.drive.DriveApi
+import com.artbrain.ebwo.text.Convert
 import com.artbrain.ebwo.text.Epub
 import com.artbrain.ebwo.ui.Ink
 import kotlinx.coroutines.Dispatchers
@@ -42,10 +43,11 @@ object Fetch {
         onProgress: (Int) -> Unit = {},
     ): String {
         val api = DriveApi(token)
-        if (!doc.isEpub) return api.exportText(doc.id).also {
+        if (doc.mimeType == Doc.GOOGLE_DOC) return api.exportText(doc.id).also {
             store.writeBody(doc.id, it)
             onProgress(100)
         }
+        if (!doc.isEpub) return plain(ctx, store, api, doc, onProgress)
 
         val work = File(ctx.cacheDir, "epub").apply { mkdirs() }
         val file = File(work, "${doc.id}.epub")
@@ -65,6 +67,32 @@ object Fetch {
         } finally {
             file.delete()
             staged.deleteRecursively()
+        }
+    }
+
+    /**
+     * docx·txt·md·srt — 파일을 받아 기기에서 글로 푼다. 한글 인코딩은 [Convert.decode]
+     * 가 알아맞힌다(EUC-KR·MS949 자막이 흔하다). 받기가 9할이다.
+     */
+    private suspend fun plain(
+        ctx: Context, store: DocStore, api: DriveApi, doc: Doc, onProgress: (Int) -> Unit,
+    ): String {
+        val file = File(File(ctx.cacheDir, "file").apply { mkdirs() }, "${doc.id}.bin")
+        try {
+            api.download(doc.id, file) { onProgress((it * DOWNLOAD_SHARE).toInt()) }
+            return withContext(Dispatchers.IO) {
+                val text = try {
+                    Convert.text(doc.mimeType, file)
+                } catch (e: Convert.Unsupported) {
+                    throw IllegalArgumentException(e.message)
+                }
+                if (text.isBlank()) throw IllegalArgumentException("읽을 글을 찾지 못했습니다.")
+                store.writeBody(doc.id, text)
+                onProgress(100)
+                text
+            }
+        } finally {
+            file.delete()
         }
     }
 

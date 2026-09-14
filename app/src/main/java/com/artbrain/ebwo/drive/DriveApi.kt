@@ -1,6 +1,7 @@
 package com.artbrain.ebwo.drive
 
 import com.artbrain.ebwo.store.Doc
+import com.artbrain.ebwo.text.Convert
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -12,7 +13,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
- * 드라이브에서 구글 문서·epub 목록과 본문을 받아 온다.
+ * 드라이브에서 구글 문서·epub·docx·txt·md·srt 목록과 본문을 받아 온다.
  *
  * 구글 API 클라이언트 라이브러리를 쓰지 않는다 — 덩치가 크고, 우리가 부르는
  * 것은 두 갈래뿐이다. 메모리가 넉넉하지 않은 기기라 OkHttp 로 곧장 부른다.
@@ -21,7 +22,8 @@ import java.util.concurrent.TimeUnit
  * 인코딩을 알아맞힐 일이 없다. (SAF 문서 선택창은 구글 문서를 PDF 로만
  * 내주지만, 그 제약은 SAF 것이고 API 에는 없다.)
  *
- * epub 은 변환할 것이 없으므로 파일을 그대로 받는다([download]).
+ * 그 밖의 파일(epub·docx·txt·md·srt)은 그대로 받아([download]) 기기에서 푼다
+ * ([com.artbrain.ebwo.text.Convert] — 30EBSE 와 같은 파일).
  */
 class DriveApi(private val token: String) {
 
@@ -30,13 +32,23 @@ class DriveApi(private val token: String) {
         .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    /** 휴지통에 없는 구글 문서와 epub 전부. 최근 고친 것이 앞에 온다. */
+    /**
+     * 휴지통에 없는, 읽을 수 있는 파일 전부. 최근 고친 것이 앞에 온다.
+     *
+     * md·srt 는 드라이브가 종류를 모르고 `application/octet-stream` 으로 두는 일이
+     * 흔하다. 그래서 그 종류도 함께 묻고 **확장자로 걸러** 읽을 수 있는 것만 남긴다
+     * ([Convert.kindOf]).
+     *
+     * **곁다리 파일은 뺀다**([isClutter]). 폰트·앱을 풀어 올린 폴더에 딸려 온 readme·
+     * license·changelog 따위가 드라이브에 수백 개 있다(실측: 읽을 것 301개 중 130개 남짓).
+     * 드라이브의 파일은 건드리지 않고 목록에만 올리지 않는다.
+     */
     suspend fun listDocs(): List<Doc> = withContext(Dispatchers.IO) {
         val out = ArrayList<Doc>()
         var pageToken: String? = null
         do {
             val url = StringBuilder(FILES)
-                .append("?q=").append(enc("(mimeType='${Doc.GOOGLE_DOC}' or mimeType='${Doc.EPUB}') and trashed=false"))
+                .append("?q=").append(enc("(${MIMES.joinToString(" or ") { "mimeType='$it'" }}) and trashed=false"))
                 .append("&orderBy=").append(enc("modifiedTime desc"))
                 .append("&pageSize=100")
                 .append("&fields=").append(enc("nextPageToken,files(id,name,modifiedTime,mimeType)"))
@@ -48,10 +60,12 @@ class DriveApi(private val token: String) {
             if (files != null) for (i in 0 until files.length()) {
                 val f = files.getJSONObject(i)
                 val mime = f.optString("mimeType", Doc.GOOGLE_DOC)
-                var name = f.optString("name", "(제목 없음)")
-                // 확장자는 목록에서 뗀다 — 무엇인지는 글을 열면 안다.
-                if (mime == Doc.EPUB) name = name.removeSuffix(".epub").removeSuffix(".EPUB")
-                out += Doc(f.getString("id"), name, f.optString("modifiedTime"), mimeType = mime)
+                val name = f.optString("name", "(제목 없음)")
+                // 구글 문서는 이름 그대로. 파일은 무엇으로 풀지 정하고 확장자를 뗀다.
+                val kind = if (mime == Doc.GOOGLE_DOC) mime else Convert.kindOf(mime, name)
+                if (kind == null || (mime != Doc.GOOGLE_DOC && isClutter(name))) continue
+                val title = if (mime == Doc.GOOGLE_DOC) name else Convert.title(name)
+                out += Doc(f.getString("id"), title, f.optString("modifiedTime"), mimeType = kind)
             }
             pageToken = o.optString("nextPageToken").ifEmpty { null }
         } while (pageToken != null)
@@ -126,10 +140,47 @@ class DriveApi(private val token: String) {
         }
     }
 
+    /**
+     * 읽을 글이 아닌 파일인가.
+     *
+     * - 확장자가 epub·pdf·docx·txt·md·srt 가 아니면 뺀다 — 드라이브는 `.log` 도
+     *   text/plain 으로 둔다.
+     * - 소프트웨어·폰트 묶음에 딸려 오는 이름(readme, license, changelog, OFL, FONTLOG …)과
+     *   폰트 만들기 도구의 설정 파일(maker, count, metrics …)을 뺀다.
+     * - 압축을 풀며 이름이 깨진 것(`¼³¸í¼­` — '설명서' 의 CP949 를 Latin-1 로 읽은 것)을 뺀다.
+     */
+    private fun isClutter(name: String): Boolean {
+        val ext = name.substringAfterLast('.', "").lowercase()
+        if (ext !in READABLE_EXT) return true
+        val base = name.substringBeforeLast('.').lowercase().trim()
+        if (CLUTTER_PREFIX.any { base.startsWith(it) }) return true
+        if (base in CLUTTER_NAME || CLUTTER_PATTERN.matches(base)) return true
+        if ("open font license" in base || base.endsWith("-license")) return true
+        return base.any { it in '\u0080'..'\u00FF' } && base.none { it in '\uAC00'..'\uD7A3' }
+    }
+
     private fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")
 
     companion object {
         private const val FILES = "https://www.googleapis.com/drive/v3/files"
+        /** 목록에 묻는 종류. octet-stream 은 확장자로 한 번 더 거른다. */
+        private val MIMES = listOf(
+            Doc.GOOGLE_DOC, Convert.EPUB, Convert.PDF, Convert.DOCX, Convert.TEXT, Convert.MD, "text/x-markdown",
+            Convert.SRT, "text/srt", "application/octet-stream",
+        )
+
+        private val READABLE_EXT = setOf("epub", "pdf", "docx", "txt", "md", "markdown", "srt")
+        private val CLUTTER_PREFIX = listOf(
+            "readme", "read me", "license", "licence", "copying", "changelog", "change log",
+            "authors", "contributors", "contributing", "fontlog", "ofl", "notice", "install notes",
+        )
+        private val CLUTTER_NAME = setOf(
+            "changes", "history", "version", "credits", "maker", "count", "metrics", "hinting",
+            "groups", "neighbors", "generator_config", "base_filter", "base_avoid_tag",
+        )
+        /** k1·k2… 같은 폰트 커닝 표, errors·errors (1) 같은 도구 기록 */
+        private val CLUTTER_PATTERN = Regex("""k\d+|errors( \(\d+\))?""")
+
         const val SCOPE_DRIVE_READONLY = "https://www.googleapis.com/auth/drive.readonly"
     }
 }

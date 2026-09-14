@@ -38,6 +38,8 @@ object Net {
     /** 무엇을 하려다 난 일인지 붙여 사람 말로 돌려준다. */
     fun explain(ctx: Context, e: Throwable, doing: String): String = when {
         !online(ctx) || isOffline(e) -> OFFLINE
+        // 파일을 글로 풀지 못한 까닭(형식·손상)은 그대로 알린다.
+        e is IllegalArgumentException && !e.message.isNullOrBlank() -> e.message!!
         e.message?.contains("인증이 만료") == true -> "구글 계정 인증이 만료되었습니다.\n다시 시도하면 로그인 창이 열립니다."
         e.message?.contains("권한이 없습니다") == true -> "구글 드라이브를 읽을 권한이 없습니다."
         else -> "$doing 못했습니다.\n잠시 뒤에 다시 시도해 주세요."
