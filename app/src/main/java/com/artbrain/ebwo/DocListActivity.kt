@@ -17,6 +17,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.artbrain.ebwo.auth.DriveAuth
 import com.artbrain.ebwo.drive.DriveApi
 import com.artbrain.ebwo.drive.Net
+import com.artbrain.ebwo.drive.Updater
 import com.artbrain.ebwo.store.Doc
 import com.artbrain.ebwo.store.DocStore
 import com.artbrain.ebwo.store.Fetch
@@ -322,7 +323,7 @@ class DocListActivity : Activity() {
     }
 
     private fun refresh() {
-        if (busy) return
+        if (busy || updating?.isActive == true) return
         say("문서 목록을 받고 있습니다…")
         requestToken(null)
     }
@@ -338,6 +339,9 @@ class DocListActivity : Activity() {
                 docs = store.loadIndex()
                 page = 0
                 say(null)
+                // 목록을 받은 김에 앱의 새 판도 본다. 목록이 실패했으면 그 까닭을
+                // 알리는 팝업을 덮지 않도록 여기서만 본다.
+                checkUpdate()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -348,6 +352,49 @@ class DocListActivity : Activity() {
                 render()
             }
         }
+    }
+
+    /** 새 판을 받는 중인 일. 받는 동안에는 새로고침을 막는다 — 팝업이 덮인다. */
+    private var updating: kotlinx.coroutines.Job? = null
+
+    /**
+     * GitHub 릴리스에 새 판이 있으면 설치할지 묻는다. 없거나 알 수 없으면 조용히 넘어간다.
+     * 왼쪽 단추 자리에 Install, 닫기는 늘 오른쪽.
+     */
+    private fun checkUpdate() {
+        if (!Net.online(this)) return
+        scope.launch {
+            val r = Updater.check(BuildConfig.VERSION_NAME) ?: return@launch
+            if (isFinishing) return@launch
+            popup.show(
+                msg = "새 버전 ${r.version} 이 있습니다.\n지금 설치할까요?",
+                undoLabel = INSTALL,
+                onUndo = { startUpdate(r) },
+                ms = UPDATE_MS,
+            )
+        }
+    }
+
+    /** 받아서 시스템 설치 화면으로 넘긴다. 설치가 끝나면 그 화면의 "열기" 로 다시 연다. */
+    private fun startUpdate(r: Updater.Release) {
+        if (!Updater.canInstall(this)) {
+            popup.show(
+                msg = "설치하려면 이 앱에 설치 권한이 필요합니다.\n켜고 돌아와 새로고침을 다시 눌러 주세요.",
+                undoLabel = SETTINGS,
+                onUndo = { Updater.openInstallSettings(this) },
+                ms = UPDATE_MS,
+            )
+            return
+        }
+        var job: kotlinx.coroutines.Job? = null
+        val progress = popup.progress("새 버전 ${r.version} 받고 있습니다") { job?.cancel() }
+        job = scope.launch {
+            val apk = Updater.download(this@DocListActivity, r, progress)
+            popup.dismiss()
+            if (apk == null) { say("새 버전을 받지 못했습니다.\n잠시 뒤에 다시 시도해 주세요."); return@launch }
+            Updater.install(this@DocListActivity, apk)
+        }
+        updating = job
     }
 
     private fun isUnauthorized(e: Exception) = e.message?.contains("인증이 만료") == true
@@ -394,6 +441,13 @@ class DocListActivity : Activity() {
 
     private companion object {
         const val KEY_PENDING = "pendingDocId"
+
+        /** 업데이트 팝업의 왼쪽 단추 */
+        const val INSTALL = "Install"
+        const val SETTINGS = "Settings"
+
+        /** 업데이트를 묻는 팝업이 머무는 시간 — 읽고 누를 틈 */
+        const val UPDATE_MS = 10_000L
 
 
         /** 누를 수 없는 화살표의 옅기 */

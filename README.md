@@ -233,6 +233,36 @@ an app` 을 꺼야 한다.** 켜져 있으면 구글 승낙 화면이 앞에 뜨
 백그라운드로 내려가면서 동결·종료되고, 승낙 결과를 받을 앱이 사라진다.
 (그래도 견디도록 하려던 일은 `savedInstanceState` 에 남긴다.)
 
+## 앱 안 업데이트와 릴리스
+
+목록의 새로고침으로 문서 목록을 받고 나면 GitHub 의 최신 릴리스
+(`marzipan2025/29EBWO`, 태그 `vX.Y.Z` + `.apk` 첨부)를 본다(`Updater`). 앱보다 새
+판이면 팝업으로 묻는다 — 왼쪽 `Install`, 오른쪽 `Close`. 설치하면 받는 동안 왼쪽에
+퍼센트, 오른쪽에 `Cancel`, 다 받으면 시스템 설치 화면으로 넘긴다. **설치가 끝나면 그
+화면의 "열기" 로 다시 연다** — 일반 앱은 설치 뒤 스스로 다시 뜰 수 없다. 25HAK3·26HAKC
+와 같은 방식이다. 목록 받기가 실패하면 그 까닭을 알리는 팝업을 덮지 않도록 보지 않는다.
+
+- 공개 저장소라 토큰 없이 읽는다. 토큰을 APK 에 넣지 않는다.
+- 처음 한 번은 "출처를 알 수 없는 앱 설치" 권한이 필요하다. 없으면 팝업의
+  `Settings` 로 설정 화면을 연다.
+- **새 APK 는 깔린 것과 같은 키로 서명돼야 덮어 설치된다.** 이 앱은 디버그 키로
+  서명한다(SHA-1 `9F:26:8E:E0:2F:76:7B:67:A7:08:C8:1C:8C:FC:11:FF:D9:C3:E3:32`).
+  구글 OAuth 도 이 SHA-1 로 등록돼 있다. 다른 맥에서 릴리스하기 전에 확인한다 —
+  다르면 기기에서 설치가 거부되고, 지우고 깔면 받아 둔 글과 읽던 자리가 사라진다.
+
+```
+keytool -list -v -keystore ~/.android/debug.keystore -storepass android | grep SHA1
+```
+
+**릴리스** — 버전은 `app/build.gradle.kts` 의 versionCode/versionName 하나다.
+
+```
+./gradlew :app:assembleDebug
+cp app/build/outputs/apk/debug/app-debug.apk /tmp/29EBWO-X.Y.Z.apk
+git tag vX.Y.Z && git push origin vX.Y.Z
+gh release create vX.Y.Z /tmp/29EBWO-X.Y.Z.apk -t "29EBWO X.Y.Z" -n "변경 요약"
+```
+
 ## epub
 
 `files.get?alt=media` 로 파일을 그대로 받아 디스크에 흘려 쓴다(사진이 든 책은
@@ -301,6 +331,13 @@ XHTML 은 `Markup` 이 너그럽게 훑는다. epub 속 XHTML 에는 `&nbsp;` �
 **테스트 상태의 토큰이 7일마다 만료될 수 있다.** 이 경로는 refresh token 을
 앱이 들지 않고 GMS 가 쥐므로 안 걸릴 수도 있다 — 일주일 써 봐야 안다.
 걸리면 서비스 계정(폴더 공유) 으로 바꾸면 영구히 해결된다.
+
+## 스플래시
+
+안드로이드 12 이상은 앱이 뜨기 전에 시스템이 스플래시를 그린다. 그때는 e-ink 인지
+가릴 수 없고 창 반전도 닿지 않으므로, `values-v31` 테마가 스플래시만 검은 바탕에 흰
+`↩`(`splash_icon_reverse.png`)로 둔다. Poke4 Lite 는 안드로이드 11 이라 이 테마를
+읽지 않는다(시스템 스플래시도 없다).
 
 ## 스크린샷 찍기
 
