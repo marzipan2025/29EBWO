@@ -12,7 +12,15 @@ data class Doc(
     val modifiedTime: String,
     /** 본문을 내려받아 뒀나 */
     val cached: Boolean = false,
-)
+    val mimeType: String = GOOGLE_DOC,
+) {
+    val isEpub: Boolean get() = mimeType == EPUB
+
+    companion object {
+        const val GOOGLE_DOC = "application/vnd.google-apps.document"
+        const val EPUB = "application/epub+zip"
+    }
+}
 
 /**
  * 문서와 읽던 자리를 기기에 둔다.
@@ -22,6 +30,7 @@ data class Doc(
  *   files/index.json     구글에서 받아 온 문서 목록
  *   files/pos.json       문서마다 읽던 쪽
  *   files/docs/<id>.txt  본문
+ *   files/docs/<id>/     본문에 든 사진 (epub 만). 이름은 본문의 표가 가리킨다.
  */
 class DocStore(ctx: Context) {
 
@@ -52,7 +61,8 @@ class DocStore(ctx: Context) {
             (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
                 val id = o.getString("id")
-                Doc(id, o.getString("name"), o.optString("modifiedTime"), bodyFile(id).exists())
+                Doc(id, o.getString("name"), o.optString("modifiedTime"), bodyFile(id).exists(),
+                    o.optString("mimeType", Doc.GOOGLE_DOC))
             }.sortedByDescending { it.cached }
         }.getOrDefault(emptyList())
     }
@@ -61,6 +71,7 @@ class DocStore(ctx: Context) {
         val arr = JSONArray()
         for (d in docs) arr.put(JSONObject().apply {
             put("id", d.id); put("name", d.name); put("modifiedTime", d.modifiedTime)
+            put("mimeType", d.mimeType)
         })
         indexFile.writeText(arr.toString())
     }
@@ -69,6 +80,18 @@ class DocStore(ctx: Context) {
 
     private fun bodyFile(id: String) = File(docsDir, "${safe(id)}.txt")
     private fun trashFile(id: String) = File(trashDir, "${safe(id)}.txt")
+
+    /** 이 문서의 사진 폴더. 본문과 함께 옮기고 지운다. */
+    fun imageDir(id: String) = File(docsDir, safe(id))
+    private fun trashImageDir(id: String) = File(trashDir, safe(id))
+
+    /** 본문과 사진을 한꺼번에 바꿔 넣는다. 사진은 [staged] 폴더째 옮긴다. */
+    fun writeEpub(id: String, text: String, staged: File) {
+        val dir = imageDir(id)
+        dir.deleteRecursively()
+        if (!staged.renameTo(dir)) { staged.copyRecursively(dir, overwrite = true); staged.deleteRecursively() }
+        writeBody(id, text)
+    }
 
     fun hasBody(id: String) = bodyFile(id).exists()
 
@@ -87,18 +110,21 @@ class DocStore(ctx: Context) {
         val f = bodyFile(id)
         if (!f.exists()) return false
         trashDir.mkdirs()
+        imageDir(id).takeIf { it.exists() }?.renameTo(trashImageDir(id))
         return f.renameTo(trashFile(id))
     }
 
     /** 치워 둔 것을 되돌린다. */
     fun restoreBody(id: String): Boolean {
         val t = trashFile(id)
+        trashImageDir(id).takeIf { it.exists() }?.renameTo(imageDir(id))
         return t.exists() && t.renameTo(bodyFile(id))
     }
 
     /** 치워 둔 것을 정말 지운다. 되돌릴 기회가 지난 뒤에 부른다. */
     fun purge(id: String) {
         trashFile(id).delete()
+        trashImageDir(id).deleteRecursively()
         savePos(id, 0)
     }
 
@@ -106,11 +132,17 @@ class DocStore(ctx: Context) {
     fun purgeAll() {
         trashDir.listFiles()?.forEach { f ->
             f.name.removeSuffix(".txt").let { savePos(it, 0) }
-            f.delete()
+            f.deleteRecursively()
         }
     }
 
-    fun bodyBytes(id: String): Long = bodyFile(id).let { if (it.exists()) it.length() else 0L }
+    /** 받아 둔 크기 — 사진까지 */
+    fun bodyBytes(id: String): Long {
+        val f = bodyFile(id)
+        if (!f.exists()) return 0L
+        val images = imageDir(id).walkTopDown().filter { it.isFile }.sumOf { it.length() }
+        return f.length() + images
+    }
 
     // ── 읽던 자리 ─────────────────────────────────────────
 

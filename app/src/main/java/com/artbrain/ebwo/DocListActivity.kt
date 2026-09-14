@@ -16,6 +16,7 @@ import com.artbrain.ebwo.drive.DriveApi
 import com.artbrain.ebwo.drive.Net
 import com.artbrain.ebwo.store.Doc
 import com.artbrain.ebwo.store.DocStore
+import com.artbrain.ebwo.store.Fetch
 import com.artbrain.ebwo.ui.Fonts
 import com.artbrain.ebwo.ui.Glyph
 import com.artbrain.ebwo.ui.Ink
@@ -264,17 +265,18 @@ class DocListActivity : Activity() {
             return
         }
         if (busy) return
-        say("${doc.name} — 받고 있습니다…")
         requestToken(doc.id)
     }
 
     private fun fetchBody(token: String, doc: Doc) {
         if (busy) return
-        scope.launch {
+        var job: kotlinx.coroutines.Job? = null
+        val progress = popup.progress("${doc.name}\n받고 있습니다") { job?.cancel() }
+        job = scope.launch {
             busy = true
             try {
-                val text = DriveApi(token).exportText(doc.id)
-                store.writeBody(doc.id, text)
+                Fetch.body(this@DocListActivity, store, token, doc, progress)
+                popup.dismiss()
                 docs = store.loadIndex()
                 say(null)
                 render()
@@ -379,8 +381,9 @@ class DocListActivity : Activity() {
 
     private fun showStatus() {
         val msg = when {
-            busy -> "받고 있습니다…"
-            docs.isEmpty() -> "새로고침을 눌러 구글 문서를 받아오세요."
+            // 목록이 있으면 받는 중인 것은 팝업이 알린다. 칸 위에 겹쳐 쓰지 않는다.
+            busy && docs.isEmpty() -> "받고 있습니다…"
+            docs.isEmpty() -> "새로고침을 눌러 구글 문서와 epub 을 받아오세요."
             else -> null
         }
         empty.text = msg.orEmpty()

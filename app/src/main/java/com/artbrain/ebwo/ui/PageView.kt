@@ -1,13 +1,17 @@
 package com.artbrain.ebwo.ui
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.util.AttributeSet
 import android.view.View
+import com.artbrain.ebwo.text.Epub
 import com.artbrain.ebwo.text.PageBuilder
 import com.artbrain.ebwo.text.Sentences
 import com.artbrain.ebwo.text.WordWrap
@@ -24,6 +28,10 @@ import kotlin.math.floor
  *
  * 글자에는 앤티에일리어싱을 쓴다 — 212dpi 에서 계단이 보이면 읽기 힘들다.
  * 회색 무늬를 쓰는 [Halftone] 과는 반대로 가는 것이 맞다.
+ *
+ * **사진도 한 쪽이다.** 본문에 `￼0001.png` 로 적힌 쪽은 [imageDir] 의 사진을
+ * 그린다. 사진은 받을 때 이미 상자 폭의 정사각형에 맞춰 두었으므로 늘리지 않고
+ * 한 픽셀씩 그대로 옮긴다 — 보간이 끼면 16단계 회색이 흐려진다.
  */
 class PageView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null,
@@ -38,6 +46,9 @@ class PageView @JvmOverloads constructor(
     private var raw: String = ""
     private var pages: List<String> = emptyList()
     private var layout: StaticLayout? = null
+    private var imageDir: java.io.File? = null
+    private var bitmap: Bitmap? = null
+    private val bitmapPaint = Paint().apply { isFilterBitmap = false; isAntiAlias = false }
     private var pendingRestore = 0
 
     /** 글 상자의 크기 — 화면 가운데 [Ink.BOX_FRACTION] 만큼 */
@@ -67,9 +78,10 @@ class PageView @JvmOverloads constructor(
         repaginate()
     }
 
-    /** 문서 본문을 앉힌다. [restore] 쪽부터 보여 준다. */
-    fun setDocument(text: String, restore: Int) {
+    /** 문서 본문을 앉힌다. [restore] 쪽부터 보여 준다. 사진은 [images] 에서 찾는다. */
+    fun setDocument(text: String, restore: Int, images: java.io.File? = null) {
         raw = text
+        imageDir = images
         pendingRestore = restore
         repaginate()
     }
@@ -119,7 +131,14 @@ class PageView @JvmOverloads constructor(
 
     private fun rebuildLayout() {
         val s = pages.getOrNull(page)
+        bitmap?.recycle()
+        bitmap = null
         if (s == null || width <= 0) { layout = null; return }
+        val img = imageFor(s)
+        if (img != null) {
+            bitmap = BitmapFactory.decodeFile(img.path)
+            if (bitmap != null) { layout = null; return }
+        }
         // 우리가 끊은 줄을 그대로 그린다. 줄바꿈이 이미 박혀 있으므로
         // StaticLayout 이 따로 끊을 일이 없다.
         val wrapped = wrapLines(s).joinToString("\n")
@@ -131,19 +150,28 @@ class PageView @JvmOverloads constructor(
             .build()
     }
 
-    /** 지금 글줄 덩이의 위·아래 자리. 글이 없으면 null. */
+    /** 이 쪽이 사진이면 그 파일. 표가 있어도 파일이 없으면 글로 그린다. */
+    private fun imageFor(s: String): java.io.File? {
+        if (s.firstOrNull() != Epub.IMAGE_MARK) return null
+        val name = s.substring(1).trim()
+        if (name.isEmpty() || '/' in name) return null
+        return java.io.File(imageDir ?: return null, name).takeIf { it.isFile }
+    }
+
+    /** 지금 글줄 덩이(또는 사진)의 위·아래 자리. 아무것도 없으면 null. */
     val textTop: Float?
-        get() = layout?.let { (height - it.height) / 2f }
+        get() = bitmap?.let { (height - it.height) / 2f } ?: layout?.let { (height - it.height) / 2f }
 
     val textBottom: Float?
-        get() = layout?.let { (height - it.height) / 2f + it.height }
+        get() = bitmap?.let { (height + it.height) / 2f } ?: layout?.let { (height - it.height) / 2f + it.height }
 
-    /** [x],[y] 가 글이 놓인 네모 안인가 — 상자 폭과 글줄 높이로 잰다. */
+    /** [x],[y] 가 글이 놓인 네모 안인가 — 상자 폭과 글줄 높이로 잰다. 사진은 사진 네모. */
     fun hitsText(x: Float, y: Float): Boolean {
         val t = textTop ?: return false
         val b = textBottom ?: return false
-        val left = (width - boxW) / 2f
-        return x >= left && x <= left + boxW && y >= t && y <= b
+        val w = bitmap?.width ?: boxW
+        val left = (width - w) / 2f
+        return x >= left && x <= left + w && y >= t && y <= b
     }
 
     /** 다음 쪽으로. 마지막이면 false. */
@@ -162,6 +190,11 @@ class PageView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(Ink.WHITE)
+        bitmap?.let {
+            // 정수 픽셀에 놓아야 한 픽셀씩 그대로 옮겨진다.
+            canvas.drawBitmap(it, ((width - it.width) / 2).toFloat(), ((height - it.height) / 2).toFloat(), bitmapPaint)
+            return
+        }
         val l = layout ?: return
         canvas.save()
         canvas.translate((width - boxW) / 2f, (height - l.height) / 2f)

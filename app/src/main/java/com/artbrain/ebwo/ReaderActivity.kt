@@ -22,9 +22,9 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.artbrain.ebwo.auth.DriveAuth
-import com.artbrain.ebwo.drive.DriveApi
 import com.artbrain.ebwo.drive.Net
 import com.artbrain.ebwo.store.DocStore
+import com.artbrain.ebwo.store.Fetch
 import com.artbrain.ebwo.ui.Fonts
 import com.artbrain.ebwo.ui.Glyph
 import com.artbrain.ebwo.ui.Ink
@@ -196,7 +196,7 @@ class ReaderActivity : Activity() {
             say("받아 둔 글이 없습니다. 새로고침을 눌러 주세요.")
             setUiVisible(true)
         } else {
-            pageView.setDocument(body, store.loadPos(docId))
+            pageView.setDocument(body, store.loadPos(docId), store.imageDir(docId))
             setUiVisible(false)
         }
     }
@@ -420,15 +420,17 @@ class ReaderActivity : Activity() {
     private fun refresh() {
         if (busy || docId.isEmpty()) return
         if (!Net.online(this)) { say(Net.OFFLINE); return }
-        say("다시 받고 있습니다…")
         pending = { token ->
-            scope.launch {
+            var job: kotlinx.coroutines.Job? = null
+            val progress = popup.progress("다시 받고 있습니다") { job?.cancel() }
+            job = scope.launch {
                 busy = true
                 try {
-                    val text = DriveApi(token).exportText(docId)
-                    store.writeBody(docId, text)
+                    val doc = store.loadIndex().firstOrNull { it.id == docId }
+                        ?: throw IllegalStateException("문서를 찾을 수 없습니다.")
+                    val text = Fetch.body(this@ReaderActivity, store, token, doc, progress)
                     val keep = pageView.page
-                    pageView.setDocument(text, keep)
+                    pageView.setDocument(text, keep, store.imageDir(docId))
                     say("다시 받았습니다.")
                 } catch (e: CancellationException) {
                     throw e

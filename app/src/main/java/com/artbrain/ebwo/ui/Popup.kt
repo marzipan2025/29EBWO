@@ -20,6 +20,8 @@ import android.widget.TextView
  * 단추는 아래에 한 줄로 놓는다. **닫기는 늘 오른쪽**, 되돌리기가 있으면
  * **왼쪽**이다. 되돌리기는 되돌리지 않아도 그만인 일이라 옅게 두고, 닫기는
  * 검게 둔다.
+ *
+ * 받는 동안은 같은 자리를 쓴다([progress]) — 왼쪽에 퍼센트, 오른쪽에 Cancel.
  */
 class Popup(private val root: FrameLayout) {
 
@@ -64,14 +66,7 @@ class Popup(private val root: FrameLayout) {
             // 뒤쪽으로 누름이 새어 나가지 않게 한다.
             isClickable = true
             minimumWidth = Ink.dp(ctx, 260f).toInt()
-            addView(TextView(ctx).apply {
-                text = msg
-                setTextColor(Color.BLACK)
-                gravity = Gravity.CENTER
-                typeface = Fonts.of(ctx, Fonts.BODY)
-                setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f)
-                setPadding(0, 0, 0, pad)
-            })
+            addView(message(msg, pad))
             addView(row, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -85,6 +80,84 @@ class Popup(private val root: FrameLayout) {
         box = v
         hand.removeCallbacks(hide)
         hand.postDelayed(hide, ms)
+    }
+
+    /**
+     * 받는 동안 띄운다. 왼쪽 되돌리기 자리에 퍼센트를, 오른쪽에 Cancel 을 둔다.
+     * 저절로 닫히지 않는다 — 끝나면 [dismiss] 로 닫는다.
+     *
+     * 퍼센트는 **숫자가 바뀔 때만** 고쳐 쓴다. e-ink 는 고쳐 그릴 때마다
+     * 깜빡이므로 같은 값을 거듭 쓰지 않는다.
+     *
+     * @return 퍼센트(0~100)를 받는 함수. 아무 스레드에서 불러도 된다.
+     */
+    fun progress(msg: String, onCancel: () -> Unit): (Int) -> Unit {
+        dismiss(runExpire = true)
+        val pad = Ink.dp(ctx, 20f).toInt()
+        val percent = label("0%")
+        val row = FrameLayout(ctx).apply {
+            addView(percent, lp(Gravity.START))
+            addView(button(CANCEL, 1f, Fonts.REGULAR) { dismiss(); onCancel() }, lp(Gravity.END))
+        }
+        val v = frame(pad).apply {
+            addView(message(msg, pad))
+            addView(row, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ))
+        }
+        root.addView(v, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.CENTER,
+        ))
+        box = v
+        hand.removeCallbacks(hide)
+
+        var shown = 0
+        return { p ->
+            val q = p.coerceIn(0, 100)
+            hand.post {
+                if (box === v && q != shown) { shown = q; percent.text = "$q%" }
+            }
+        }
+    }
+
+    private fun frame(pad: Int) = LinearLayout(ctx).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        setPadding(pad, pad, pad, pad / 2)
+        background = GradientDrawable().apply {
+            setColor(Color.WHITE)
+            setStroke(Ink.dp(ctx, 1.5f).toInt(), Color.BLACK)
+        }
+        isClickable = true
+        minimumWidth = Ink.dp(ctx, 260f).toInt()
+    }
+
+    /** 알림 글. 단추보다 한 단 작게, 줄 사이는 조금 넉넉히. */
+    private fun message(msg: String, pad: Int) = TextView(ctx).apply {
+        text = msg
+        setTextColor(Color.BLACK)
+        gravity = Gravity.CENTER
+        typeface = Fonts.of(ctx, Fonts.BODY)
+        setTextSize(TypedValue.COMPLEX_UNIT_DIP, MSG_DP)
+        setLineSpacing(Ink.dp(ctx, MSG_LINE_ADD_DP), 1f)
+        setPadding(0, 0, 0, pad)
+    }
+
+    /** 누를 수 없는 단추 자리 글 — 단추와 같은 꼴·같은 자리 */
+    private fun label(text: String) = TextView(ctx).apply {
+        this.text = text
+        setTextColor(Color.BLACK)
+        gravity = Gravity.CENTER
+        typeface = Fonts.of(ctx, Fonts.UI)
+        fontVariationSettings = Fonts.REGULAR
+        setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16f)
+        includeFontPadding = false
+        val p = Ink.dp(ctx, 10f).toInt()
+        setPadding(p, p, p, p)
+        minHeight = Ink.dp(ctx, 44f).toInt()
     }
 
     /**
@@ -125,6 +198,11 @@ class Popup(private val root: FrameLayout) {
 
     companion object {
         private const val CLOSE = "Close"
+        private const val CANCEL = "Cancel"
+
+        /** 알림 글 크기와 더하는 줄 간격 */
+        private const val MSG_DP = 12f
+        private const val MSG_LINE_ADD_DP = 2f
 
         const val PLAIN_MS = 4_000L
         const val UNDO_MS = 6_000L
