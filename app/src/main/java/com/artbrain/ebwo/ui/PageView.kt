@@ -189,7 +189,8 @@ class PageView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
-        canvas.drawColor(Ink.WHITE)
+        // 바탕은 칠하지 않는다 — 루트가 흰 종이이고, 그 사이에 [Chime] 이
+        // 글자 뒤로 깔린다.
         bitmap?.let {
             // 정수 픽셀에 놓아야 한 픽셀씩 그대로 옮겨진다.
             canvas.drawBitmap(it, ((width - it.width) / 2).toFloat(), ((height - it.height) / 2).toFloat(), bitmapPaint)

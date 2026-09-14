@@ -11,12 +11,16 @@ import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.artbrain.ebwo.auth.DriveAuth
 import com.artbrain.ebwo.drive.DriveApi
 import com.artbrain.ebwo.drive.Net
 import com.artbrain.ebwo.store.Doc
 import com.artbrain.ebwo.store.DocStore
 import com.artbrain.ebwo.store.Fetch
+import com.artbrain.ebwo.ui.Chime
 import com.artbrain.ebwo.ui.Fonts
 import com.artbrain.ebwo.ui.Glyph
 import com.artbrain.ebwo.ui.Ink
@@ -57,11 +61,17 @@ class DocListActivity : Activity() {
     /** 아래 상태줄에 띄울 말. null 이면 형편에 맞는 기본 말이 나온다. */
     private var status: String? = null
     private val popup by lazy { Popup(root) }
+    private lateinit var chime: Chime
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_doclist)
         store = DocStore(this)
+
+        // 리더처럼 시스템 막대를 걷는다. 쓸어내릴 때만 잠깐 나온다. 활용공간은
+        // 화면 비율로 잡으므로 막대 높이만큼 위가 비는 일이 없다.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        hideBars()
 
         root = findViewById(R.id.root)
         rows = findViewById(R.id.rows)
@@ -72,6 +82,7 @@ class DocListActivity : Activity() {
         btnPrev = findViewById(R.id.prev)
         btnNext = findViewById(R.id.next)
         btnRefresh = findViewById(R.id.refresh)
+        chime = Chime(this, root)
 
         btnPrev.setOnClickListener { if (page > 0) { page--; render() } }
         btnNext.setOnClickListener { if (page < lastPage()) { page++; render() } }
@@ -124,11 +135,19 @@ class DocListActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        // 계정 고르는 창 따위에서 돌아오면 막대가 다시 나와 있을 수 있다.
+        hideBars()
+        chime.resume()
         // 읽고 돌아오면 받아 둔 표시가 바뀔 수 있다.
         if (::store.isInitialized && perPage > 0) {
             docs = store.loadIndex()
             render()
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        chime.pause()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -139,6 +158,13 @@ class DocListActivity : Activity() {
     override fun onDestroy() {
         scope.cancel()
         super.onDestroy()
+    }
+
+    private fun hideBars() {
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     /** 이 화면의 모든 글자에 쓰는 꼴 — 가는 이탤릭 Geist Mono. */

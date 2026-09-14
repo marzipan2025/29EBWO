@@ -25,6 +25,7 @@ import com.artbrain.ebwo.auth.DriveAuth
 import com.artbrain.ebwo.drive.Net
 import com.artbrain.ebwo.store.DocStore
 import com.artbrain.ebwo.store.Fetch
+import com.artbrain.ebwo.ui.Chime
 import com.artbrain.ebwo.ui.Fonts
 import com.artbrain.ebwo.ui.Glyph
 import com.artbrain.ebwo.ui.Ink
@@ -65,6 +66,7 @@ class ReaderActivity : Activity() {
     private val scope = MainScope()
     private val hand = Handler(Looper.getMainLooper())
     private val popup by lazy { Popup(root) }
+    private lateinit var chime: Chime
     private lateinit var store: DocStore
 
     private lateinit var root: FrameLayout
@@ -108,6 +110,7 @@ class ReaderActivity : Activity() {
         toList = findViewById(R.id.toList)
         refreshBtn = findViewById(R.id.refresh)
         timeline = findViewById(R.id.timeline)
+        chime = Chime(this, root)
 
         // 번호는 Geist Mono 의 가는 이탤릭. 가변 폰트라 굵기 축을 100 으로 세운다.
         number.typeface = Fonts.of(this, Fonts.UI)
@@ -203,12 +206,14 @@ class ReaderActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        chime.resume()
         connectivity?.registerDefaultNetworkCallback(netWatch)
         tickClock()
     }
 
     override fun onPause() {
         super.onPause()
+        chime.pause()
         runCatching { connectivity?.unregisterNetworkCallback(netWatch) }
         hand.removeCallbacks(tick)
         if (pageView.pageCount > 0) store.savePos(docId, pageView.page)
@@ -493,6 +498,6 @@ class ReaderActivity : Activity() {
         private const val UI_TIMEOUT_MS = 5_000L
 
         /** 시계의 옅기 — 레이아웃의 alpha 와 같다 */
-        private const val CLOCK_ALPHA = 0.7f
+        private const val CLOCK_ALPHA = 0.8f
     }
 }
