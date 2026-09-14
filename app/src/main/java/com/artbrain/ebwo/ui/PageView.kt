@@ -120,8 +120,12 @@ class PageView @JvmOverloads constructor(
             s.isEmpty() || wrapLines(s).size <= maxLines
         }
 
+        // 짧은 꼬리를 붙일 때만 한 줄 더. 상자 높이가 허락하는 만큼만.
+        val tailLines = minOf(Ink.MAX_LINES_TAIL, roomy).coerceAtLeast(maxLines)
+        val fitsTail: (String) -> Boolean = { s -> wrapLines(s).size <= tailLines }
+
         pages = if (raw.isBlank()) emptyList()
-        else PageBuilder.build(Sentences.split(raw), fits)
+        else PageBuilder.build(Sentences.split(raw), fits, fitsTail)
 
         android.util.Log.i("EBWO", "box=${boxW}x${boxH} lineH=${"%.1f".format(lineHeight())} " +
             "maxLines=$maxLines 한줄글자=${(boxW / paint.measureText("가")).toInt()} " +
@@ -163,21 +167,6 @@ class PageView @JvmOverloads constructor(
         return java.io.File(imageDir ?: return null, name).takeIf { it.isFile }
     }
 
-    /** 지금 글줄 덩이(또는 사진)의 위·아래 자리. 아무것도 없으면 null. */
-    val textTop: Float?
-        get() = bitmap?.let { (height - it.height) / 2f } ?: layout?.let { (height - it.height) / 2f }
-
-    val textBottom: Float?
-        get() = bitmap?.let { (height + it.height) / 2f } ?: layout?.let { (height - it.height) / 2f + it.height }
-
-    /** [x],[y] 가 글이 놓인 네모 안인가 — 상자 폭과 글줄 높이로 잰다. 사진은 사진 네모. */
-    fun hitsText(x: Float, y: Float): Boolean {
-        val t = textTop ?: return false
-        val b = textBottom ?: return false
-        val w = bitmap?.width ?: boxW
-        val left = (width - w) / 2f
-        return x >= left && x <= left + w && y >= t && y <= b
-    }
 
     /** 다음 쪽으로. 마지막이면 false. */
     fun next(): Boolean {

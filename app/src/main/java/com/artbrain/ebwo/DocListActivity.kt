@@ -367,13 +367,20 @@ class DocListActivity : Activity() {
             val r = Updater.check(BuildConfig.VERSION_NAME) ?: return@launch
             if (isFinishing) return@launch
             popup.show(
-                msg = "새 버전 ${r.version} 이 있습니다.\n지금 설치할까요?",
+                msg = "새 버전 ${r.version}${subjectParticle(r.version)} 있습니다.\n지금 설치할까요?",
                 undoLabel = INSTALL,
                 onUndo = { startUpdate(r) },
                 ms = UPDATE_MS,
             )
         }
     }
+
+    /**
+     * 버전 뒤의 조사 — `0.2.5가`, `0.2.6이`. 끝 숫자를 읽는 소리에 받침이 있으면
+     * 이(영·일·삼·육·칠·팔), 없으면 가(이·사·오·구).
+     */
+    private fun subjectParticle(version: String): String =
+        if (version.lastOrNull() in listOf('2', '4', '5', '9')) "가" else "이"
 
     /** 받아서 시스템 설치 화면으로 넘긴다. 설치가 끝나면 그 화면의 "열기" 로 다시 연다. */
     private fun startUpdate(r: Updater.Release) {

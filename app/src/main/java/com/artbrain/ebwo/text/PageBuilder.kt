@@ -9,6 +9,11 @@ package com.artbrain.ebwo.text
  * 들어가는지 여부는 [fits] 가 판단한다 — 글자 수가 아니라 실제로 그려 본
  * 줄 수로 재야 정확해서, 재는 일은 안드로이드 쪽에 맡기고 여기서는 어디서
  * 자를지만 고른다. 덕분에 이 갈래는 JVM 에서 그대로 시험할 수 있다.
+ *
+ * **꼬리가 짧으면 앞 쪽에 붙인다.** 쪼갠 마지막 조각이 [SHORT_TAIL] 자보다
+ * 짧으면(`있었다.` 따위) 한 쪽을 혼자 쓰기엔 허전하다. 앞 조각과 합쳐
+ * [fitsTail] 에 들어가면(한 줄 더, 다섯 줄까지) 그 쪽만 예외로 길게 둔다.
+ * 들어가지 않으면 나눈 채로 둔다. 글자 수는 띄어쓰기와 부호까지 센다.
  */
 object PageBuilder {
 
@@ -27,27 +32,49 @@ object PageBuilder {
         }
     }
 
-    fun build(sentences: List<String>, fits: (String) -> Boolean): List<String> {
+    /** 쪼갠 마지막 조각이 이 글자 수보다 짧으면 앞 조각에 붙여 본다 */
+    const val SHORT_TAIL = 7
+
+    fun build(
+        sentences: List<String>,
+        fits: (String) -> Boolean,
+        fitsTail: ((String) -> Boolean)? = null,
+    ): List<String> {
         val out = ArrayList<String>(sentences.size)
-        for (s in sentences) out += chop(s, fits)
+        for (s in sentences) out += chop(s, fits, fitsTail)
         return out
     }
 
     /** 한 문장을 들어가는 크기로 쪼갠다. 들어가면 그대로 하나다. */
-    fun chop(sentence: String, fits: (String) -> Boolean): List<String> {
+    fun chop(
+        sentence: String,
+        fits: (String) -> Boolean,
+        fitsTail: ((String) -> Boolean)? = null,
+    ): List<String> {
         val s = sentence.trim()
         if (s.isEmpty()) return emptyList()
         if (fits(s)) return listOf(s)
 
-        val out = ArrayList<String>()
+        // 조각과 그 조각이 원문에서 시작하는 자리
+        val pieces = ArrayList<Pair<Int, String>>()
         var start = 0
         while (start < s.length) {
             val cut = findCut(s, start, fits)
-            out += s.substring(start, cut).trim()
+            val piece = s.substring(start, cut).trim()
+            if (piece.isNotEmpty()) pieces += start to piece
             start = cut
             while (start < s.length && s[start] == ' ') start++
         }
-        return out.filter { it.isNotEmpty() }
+
+        if (fitsTail != null && pieces.size >= 2 && pieces.last().second.length < SHORT_TAIL) {
+            // 앞 조각의 시작부터 원문 끝까지 — 잘렸던 자리의 띄어쓰기도 그대로 살린다.
+            val merged = s.substring(pieces[pieces.size - 2].first).trim()
+            if (fitsTail(merged)) {
+                pieces.removeAt(pieces.size - 1)
+                pieces[pieces.size - 1] = pieces.last().first to merged
+            }
+        }
+        return pieces.map { it.second }
     }
 
     /**

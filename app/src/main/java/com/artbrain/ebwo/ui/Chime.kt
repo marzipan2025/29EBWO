@@ -16,7 +16,7 @@ import android.widget.FrameLayout
 import java.util.Calendar
 
 /**
- * 정각과 10분마다 **글자 뒤로 큰 시각을 1.5초 띄웠다가 걷고, 0.1초 뒤 화면을 한 번
+ * 정각과 15분마다 **글자 뒤로 큰 시각을 1.5초 띄웠다가 걷고, 0.1초 뒤 화면을 한 번
  * 크게 고친다.**
  *
  * e-ink 는 빠른 부분 갱신만 거듭하면 잔상이 쌓인다. 전체 갱신(GC16)은 화면이
@@ -24,7 +24,7 @@ import java.util.Calendar
  * 묶는다. 깜빡임에 까닭이 생긴다.
  *
  * - **글자 아래에 깐다.** 루트의 맨 뒤(0번) 자식으로 넣는다. 누름을 먹지 않는다.
- * - **분이 바뀌는 신호(TIME_TICK)를 받는다.** Handler 로 다음 10분까지 재면
+ * - **분이 바뀌는 신호(TIME_TICK)를 받는다.** Handler 로 다음 15분까지 재면
  *   기기가 잠들었다 깨거나 시계를 고쳤을 때 어긋난다. 신호는 분의 첫머리에
  *   오므로 따로 맞출 것이 없다.
  * - **화면에 보일 때만 산다**([resume]/[pause]). 떠 있는 동안 다른 화면으로
@@ -121,8 +121,8 @@ class Chime(private val activity: Activity, private val root: FrameLayout) {
     }
 
     private companion object {
-        /** 몇 분마다 — 정각과 매 10분 */
-        const val EVERY_MIN = 10
+        /** 몇 분마다 — 정각과 매 15분(00·15·30·45) */
+        const val EVERY_MIN = 15
         /** 떠 있는 시간 */
         const val SHOW_MS = 1_500L
         /** 걷은 뒤 전체 갱신까지 */
