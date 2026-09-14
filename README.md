@@ -274,6 +274,11 @@ git tag vX.Y.Z && git push origin vX.Y.Z
 gh release create vX.Y.Z /tmp/29EBWO-X.Y.Z.apk -t "29EBWO X.Y.Z" -n "변경 요약"
 ```
 
+**한 번 릴리스한 버전 번호는 다시 쓰지 않는다.** 앱은 GitHub 버전이 자기보다
+높을 때만 알린다. 같은 번호로 APK 만 바꿔 올리면, 먼저 받아 간 기기는 새것을
+영영 받지 못한다(0.2.6 을 세 번 올렸다가 두 기기가 첫 판에 머물렀다 — 0.2.8 로
+넘겼다). 고칠 것이 생기면 번호를 올린다.
+
 ## epub
 
 `files.get?alt=media` 로 파일을 그대로 받아 디스크에 흘려 쓴다(사진이 든 책은
