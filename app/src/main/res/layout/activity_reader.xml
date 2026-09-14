@@ -24,12 +24,13 @@
         android:paddingEnd="10dp"
         android:textColor="@android:color/black" />
 
-    <!-- 조작판이 꺼져 있을 때만 보이는 시계. 자리는 코드에서 잡는다. -->
+    <!-- 조작판이 꺼져 있을 때만 보이는 시계. 자리는 코드에서 잡는다.
+         망이 없으면 검은 네모에 흰 Offline 이 되므로 폭은 글자만큼만. -->
     <TextView
         android:id="@+id/clock"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="top"
+        android:layout_gravity="top|center_horizontal"
         android:alpha="0.7"
         android:gravity="center_horizontal"
         android:includeFontPadding="false"

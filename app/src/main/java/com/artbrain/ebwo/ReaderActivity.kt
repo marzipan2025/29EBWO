@@ -1,7 +1,12 @@
 package com.artbrain.ebwo
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -198,11 +203,13 @@ class ReaderActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        connectivity?.registerDefaultNetworkCallback(netWatch)
         tickClock()
     }
 
     override fun onPause() {
         super.onPause()
+        runCatching { connectivity?.unregisterNetworkCallback(netWatch) }
         hand.removeCallbacks(tick)
         if (pageView.pageCount > 0) store.savePos(docId, pageView.page)
     }
@@ -242,19 +249,69 @@ class ReaderActivity : Activity() {
 
     private val tick = Runnable { tickClock() }
 
-    /** 시계를 고쳐 쓰고 다음 분이 시작할 때 다시 부른다. */
+    private val connectivity by lazy {
+        getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+    }
+
+    /** 망이 붙거나 끊기면 다음 분을 기다리지 않고 시계 자리를 고친다. */
+    private val netWatch = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) { hand.post { tickClock() } }
+        override fun onLost(network: Network) { hand.post { tickClock() } }
+        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+            hand.post { tickClock() }
+        }
+    }
+
+    /** 지금 시계 자리가 Offline 꼴인가. 같은 꼴이면 다시 칠하지 않는다. */
+    private var clockOffline: Boolean? = null
+
+    /**
+     * 시계를 고쳐 쓰고 다음 분이 시작할 때 다시 부른다.
+     *
+     * 망이 없으면 시각 대신 **검은 네모에 흰 `Offline`** 을 둔다. 받아 둔 글은
+     * 읽을 수 있으니 팝업으로 막지 않고, 늘 보이는 자리에 조용히 알린다.
+     */
     private fun tickClock() {
         hand.removeCallbacks(tick)
         if (uiShown) return
+        val offline = !Net.online(this)
         val now = java.util.Calendar.getInstance()
-        clock.text = "%02d:%02d".format(
+        val text = if (offline) "Offline" else "%02d:%02d".format(
             now.get(java.util.Calendar.HOUR_OF_DAY),
             now.get(java.util.Calendar.MINUTE),
         )
+        if (offline != clockOffline || clock.text != text) {
+            clock.text = text
+            styleClock(offline)
+        }
         // 다음 분까지 남은 만큼만 기다린다 — 쓸데없이 깨우지 않는다.
         val wait = 60_000L - (now.get(java.util.Calendar.SECOND) * 1000L +
             now.get(java.util.Calendar.MILLISECOND))
         hand.postDelayed(tick, wait)
+    }
+
+    /**
+     * 시계 자리의 꼴을 정한다.
+     *
+     * Offline 은 누름 표시와 같은 셈이다 — 글자 수만큼 `▓` 를 깔고 그 위에 흰
+     * `Offline` 을 포갠다([Shade]). 둘 다 같은 붓의 글자라 네모를 따로 재지
+     * 않아도 겹친다. 흰 글자는 가는 굵기로는 무늬에 묻혀 사라지므로 굵기를
+     * 올리고, 옅기(alpha)도 걷는다.
+     */
+    private fun styleClock(offline: Boolean) {
+        clockOffline = offline
+        if (offline) {
+            clock.fontVariationSettings = Fonts.REGULAR
+            clock.setTextColor(Color.WHITE)
+            clock.background = Shade(clock, Shade.DENSE)
+            clock.alpha = 1f
+        } else {
+            clock.fontVariationSettings = Fonts.THIN
+            clock.setTextColor(Color.BLACK)
+            clock.background = null
+            clock.alpha = CLOCK_ALPHA
+        }
+        clock.post { Glyph.centerVertical(clock) }
     }
 
     /** 이전 문장으로. 갈 수 있었으면 표를 잠깐 띄운다. */
@@ -432,5 +489,8 @@ class ReaderActivity : Activity() {
         private const val TIMELINE_W = 0.45f
 
         private const val UI_TIMEOUT_MS = 5_000L
+
+        /** 시계의 옅기 — 레이아웃의 alpha 와 같다 */
+        private const val CLOCK_ALPHA = 0.7f
     }
 }

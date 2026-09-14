@@ -18,8 +18,14 @@ import android.widget.TextView
  * [owner] 의 붓을 그대로 베껴 쓰므로 글꼴·크기·굵기가 저절로 맞는다.
  * 자리 계산도 TextView 가 가운데 정렬할 때 쓰는 것과 같은 셈이라
  * **글자 상자가 정확히 포개진다.**
+ *
+ * [block] 을 바꾸면 짙기가 달라진다 — 시계 자리의 Offline 은 `▓` 위에 흰
+ * 글자를 얹는다.
  */
-class Shade(private val owner: TextView) : Drawable() {
+class Shade(
+    private val owner: TextView,
+    private val block: String = BLOCK,
+) : Drawable() {
 
     private val paint = Paint()
 
@@ -31,7 +37,7 @@ class Shade(private val owner: TextView) : Drawable() {
         paint.color = Ink.BLACK
         paint.alpha = 255
 
-        val blocks = BLOCK.repeat(owner.text?.length ?: 0)
+        val blocks = block.repeat(owner.text?.length ?: 0)
         if (blocks.isEmpty()) return
         val advance = paint.measureText(blocks)
         val fm = paint.fontMetrics
@@ -46,6 +52,9 @@ class Shade(private val owner: TextView) : Drawable() {
 
     companion object {
         private const val BLOCK = "░"
+
+        /** 짙은 무늬 — 늘 깔려 있는 표시(Offline)에 쓴다. */
+        const val DENSE = "▓"
 
         /** 누를 때만 뒤에 깔리게 붙인다. */
         fun applyTo(v: TextView) {
