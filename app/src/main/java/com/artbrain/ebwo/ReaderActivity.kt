@@ -246,7 +246,7 @@ class ReaderActivity : Activity() {
         if (x < root.width * LEFT_ZONE) {
             goPrev()
         } else {
-            if (pageView.next()) afterTurn() else say("마지막 문장입니다.")
+            if (pageView.next()) afterTurn() else sayLast()
         }
     }
 
@@ -462,9 +462,24 @@ class ReaderActivity : Activity() {
 
     private fun say(msg: String) = popup.show(msg)
 
+    /**
+     * 끝까지 읽었다. 다음으로 갈 데가 목록뿐이므로 왼쪽 단추 자리에 `List` 를
+     * 둔다 — 조작판을 열어 `↰` 를 찾지 않아도 나갈 수 있다. 닫기는 늘 오른쪽.
+     * 누를 틈을 주려고 되돌리기 팝업만큼 머문다.
+     */
+    private fun sayLast() = popup.show(
+        msg = "마지막 문장입니다.",
+        undoLabel = LIST,
+        onUndo = { finish() },
+        ms = Popup.UNDO_MS,
+    )
+
     companion object {
         const val EXTRA_ID = "id"
         const val EXTRA_NAME = "name"
+
+        /** 마지막 문장 팝업에서 목록으로 나가는 단추 */
+        private const val LIST = "List"
         /** 위에서 이만큼이 조작판 토글 자리 */
         private const val TOP_ZONE = 0.30f
 
@@ -472,7 +487,7 @@ class ReaderActivity : Activity() {
         private const val LEFT_ZONE = 0.20f
 
         /** 문장 번호가 놓이는 자리 — 화면 위에서 이 비율 */
-        private const val NUMBER_Y = 0.15f
+        private const val NUMBER_Y = Ink.EDGE_Y
 
         /** 화살표 글리프 크기 */
         private const val GLYPH_DP = 32f

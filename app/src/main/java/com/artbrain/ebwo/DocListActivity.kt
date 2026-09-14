@@ -98,16 +98,6 @@ class DocListActivity : Activity() {
         geist(btnRefresh, 24f)
         geist(btnPrev, 24f)
         geist(btnNext, 24f)
-        // 제목과 새로고침만 올린다. 자리(칸 수·아래 줄)는 건드리지 않으려고
-        // 레이아웃이 아니라 그리는 위치만 옮긴다.
-        val headUp = Ink.dp(this, HEAD_UP_DP).toInt()
-        findViewById<View>(R.id.head).translationY = -headUp.toFloat()
-
-        // 머리를 올린 만큼 위 간격이 벌어진다. 칸 묶음을 그 **절반**만큼
-        // 올리면 위아래가 같아진다 — 위는 그만큼 줄고 아래는 그만큼 늘기
-        // 때문이다. 정수 픽셀로 민다.
-        rows.translationY = -(headUp / 2).toFloat()
-
         root.post { sizeBox() }
 
         // 지난번에 치워 둔 것은 되돌릴 기회가 지났다. 여기서 쓸어 낸다.
@@ -185,12 +175,23 @@ class DocListActivity : Activity() {
         }
     }
 
-    /** 활용공간 — 화면 가운데, 폭 60% · 높이 80%. 모든 것이 이 안에 든다. */
+    /**
+     * 활용공간 — 폭은 화면의 60%. 세로는 **리더에 맞춘다**: 머리(이름·새로고침)의
+     * 가운데가 리더의 문장 번호 줄(위에서 15%)에, 발(화살표·쪽 번호)의 가운데가
+     * 리더의 시계 줄(아래에서 15%)에 선다. 두 화면을 오갈 때 위아래 줄이 제자리에
+     * 있다. 막대를 걷어 화면을 끝까지 쓰므로 비율이 곧 화면 자리다.
+     */
     private fun sizeBox() {
         if (root.width <= 0) return
+        val h = root.height
+        val touch = Ink.dp(this, Ink.TOUCH_DP).toInt()
+        val top = (h * Ink.EDGE_Y).toInt() - touch / 2
+        val bottom = (h * (1f - Ink.EDGE_Y)).toInt() + touch / 2
         (box.layoutParams as FrameLayout.LayoutParams).let {
             it.width = (root.width * Ink.BOX_FRACTION).toInt()
-            it.height = (root.height * BOX_H).toInt()
+            it.height = bottom - top
+            it.topMargin = top
+            it.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             box.layoutParams = it
         }
     }
@@ -392,11 +393,6 @@ class DocListActivity : Activity() {
     private companion object {
         const val KEY_PENDING = "pendingDocId"
 
-        /** 제목·새로고침을 올리는 높이 */
-        const val HEAD_UP_DP = 20f
-
-        /** 활용공간의 세로 몫 — 가로는 [Ink.BOX_FRACTION] 을 쓴다. */
-        const val BOX_H = 0.80f
 
         /** 누를 수 없는 화살표의 옅기 */
         const val DIM = 0.5f

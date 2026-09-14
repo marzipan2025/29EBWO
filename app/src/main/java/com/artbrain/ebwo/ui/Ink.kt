@@ -42,6 +42,12 @@ object Ink {
      */
     const val MAX_LINES = 4
 
+    /**
+     * 위아래 한 줄이 놓이는 자리 — 화면 위에서 이 비율, 아래에서도 이 비율.
+     * 리더의 문장 번호·시계와 목록의 머리·발이 같은 줄에 선다.
+     */
+    const val EDGE_Y = 0.15f
+
     /** 손가락이 닿는 자리의 최소 크기. e-ink 터치는 정밀하지 않다. */
     const val TOUCH_DP = 56f
 
