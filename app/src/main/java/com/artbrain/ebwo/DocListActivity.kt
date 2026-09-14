@@ -27,7 +27,9 @@ import com.artbrain.ebwo.ui.Fonts
 import com.artbrain.ebwo.ui.Glyph
 import com.artbrain.ebwo.ui.Ink
 import com.artbrain.ebwo.ui.Popup
+import com.artbrain.ebwo.ui.LineShade
 import com.artbrain.ebwo.ui.Shade
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
@@ -244,11 +246,13 @@ class DocListActivity : Activity() {
         // 거기를 눌러도 아무 일이 없어 "안 눌린다" 로 느껴진다.
         row.layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, rowPx())
-        row.findViewById<TextView>(R.id.name).let {
-            it.text = doc.name
-            it.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f)
-            it.alpha = if (doc.cached) 1f else 0.55f
+        val title = row.findViewById<TextView>(R.id.name).apply {
+            text = doc.name
+            setTextSize(TypedValue.COMPLEX_UNIT_DIP, TITLE_DP)
+            alpha = if (doc.cached) 1f else 0.55f
         }
+        // 누르는 동안 제목 뒤를 ░ 한 줄로 채운다 — 제목보다 1dp 작게.
+        LineShade.applyTo(row, title, TITLE_DP - 1f)
 
         val mark = row.findViewById<TextView>(R.id.mark)
         val del = row.findViewById<TextView>(R.id.del)
@@ -256,8 +260,8 @@ class DocListActivity : Activity() {
         geist(del, 20f)
 
         if (doc.cached) {
-            val kb = (store.bodyBytes(doc.id) + 1023) / 1024
-            mark.text = "${kb}kb"
+            // 메가바이트, 소수점 한 자리. 단위는 붙이지 않는다.
+            mark.text = String.format(Locale.US, "%.1f", store.bodyBytes(doc.id) / 1_048_576.0)
             del.visibility = View.VISIBLE
             del.setOnClickListener {
                 if (!store.deleteBody(doc.id)) return@setOnClickListener
@@ -447,6 +451,9 @@ class DocListActivity : Activity() {
     }
 
     private companion object {
+        /** 목록 제목 글자 크기 */
+        const val TITLE_DP = 14f
+
         const val KEY_PENDING = "pendingDocId"
 
         /** 업데이트 팝업의 왼쪽 단추 */
